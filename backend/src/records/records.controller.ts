@@ -62,6 +62,6 @@ export class RecordsController {
     @Param("module", ModuleSlugPipe) module: string,
     @Param("id", EntityIdPipe) id: string,
   ) {
-    return this.records.softDelete(user.companyId, module, id);
+    return this.records.softDelete(user.companyId, module, id, user.id);
   }
 }
