@@ -18,6 +18,7 @@ import {
 } from "./dto/module-config.dto";
 import { CreateWorkflowDto, UpdateWorkflowDto } from "./dto/workflow-config.dto";
 import { CreateManualUserDto } from "./dto/create-manual-user.dto";
+import { StarterImportDto } from "./dto/starter-import.dto";
 
 @Controller("system")
 @RequirePermission("system", "admin")
@@ -153,6 +154,14 @@ export class SystemController {
       user.id,
       dto.reason,
     );
+  }
+
+  @Post("starter-import")
+  starterImport(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: StarterImportDto,
+  ) {
+    return this.system.starterImport(user.companyId, user.id, dto);
   }
 
   @Get("audit")
