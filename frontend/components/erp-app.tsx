@@ -710,7 +710,7 @@ function LoginScreen({
   oauthMessage?: string;
 }) {
   const [username, setUsername] = useState("admin@litoralnea.com");
-  const [password, setPassword] = useState("Litoral#Admin26");
+  const [password, setPassword] = useState("");
   const [visible, setVisible] = useState(false);
   const [showDemoUsers, setShowDemoUsers] = useState(false);
   const [loading, setLoading] = useState(false);
