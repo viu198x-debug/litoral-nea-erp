@@ -228,6 +228,19 @@ export function ErpApp() {
   const [createOpen, setCreateOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
   const [runtimeWorks, setRuntimeWorks] = useState<Work[]>(works);
+  const [runtimeKpis, setRuntimeKpis] = useState({
+    activeWorks: works.length,
+    contractTotal: works.reduce((sum, work) => sum + work.contractAmount, 0),
+    certified: 0,
+    pendingCollection: 0,
+    accountsPayable: 0,
+    cashAndBanks: 0,
+    actualCost: works.reduce((sum, work) => sum + work.actualCost, 0),
+    targetBudget: works.reduce((sum, work) => sum + work.targetBudget, 0),
+    estimatedMargin: 0,
+    estimatedTaxes: 0,
+  });
+  const [dashboardGeneratedAt, setDashboardGeneratedAt] = useState<string | null>(null);
   const [runtimeModules, setRuntimeModules] = useState<ModuleDefinition[]>(modules);
   const [configurationRefresh, setConfigurationRefresh] = useState(0);
 
@@ -365,10 +378,25 @@ export function ErpApp() {
         return response.json();
       })
       .then((payload: {
+        generatedAt?: string;
+        kpis?: {
+          activeWorks: number;
+          contractTotal: number;
+          certified: number;
+          pendingCollection: number;
+          accountsPayable: number;
+          cashAndBanks: number;
+          actualCost: number;
+          targetBudget: number;
+          estimatedMargin: number;
+          estimatedTaxes: number;
+        };
         works?: Array<Record<string, unknown> & {
           client?: { legalName?: string };
         }>;
       }) => {
+        if (payload.kpis) setRuntimeKpis(payload.kpis);
+        if (payload.generatedAt) setDashboardGeneratedAt(payload.generatedAt);
         if (!payload.works?.length) return;
         setRuntimeWorks(
           payload.works.map((item) => {
@@ -550,6 +578,8 @@ export function ErpApp() {
               onNavigate={navigate}
               search={globalSearch}
               workItems={availableWorks}
+              kpis={runtimeKpis}
+              generatedAt={dashboardGeneratedAt}
             />
           ) : activeSlug === "works" ? (
             <WorksPage
@@ -1120,11 +1150,26 @@ function GeneralDashboard({
   onNavigate,
   search,
   workItems,
+  kpis,
+  generatedAt,
 }: {
   onOpenWork: (work: Work) => void;
   onNavigate: (slug: string) => void;
   search: string;
   workItems: Work[];
+  kpis: {
+    activeWorks: number;
+    contractTotal: number;
+    certified: number;
+    pendingCollection: number;
+    accountsPayable: number;
+    cashAndBanks: number;
+    actualCost: number;
+    targetBudget: number;
+    estimatedMargin: number;
+    estimatedTaxes: number;
+  };
+  generatedAt: string | null;
 }) {
   const filteredWorks = workItems.filter((work) =>
     `${work.code} ${work.name} ${work.client}`
@@ -1134,7 +1179,9 @@ function GeneralDashboard({
   return (
     <>
       <PageHeader
-        eyebrow="VIERNES · 04 SEP 2026"
+        eyebrow={generatedAt
+          ? new Intl.DateTimeFormat("es-AR", { dateStyle: "full", timeStyle: "short" }).format(new Date(generatedAt)).toUpperCase()
+          : "PANEL DE GESTIÓN"}
         title="Panel general"
         description="Situación consolidada de LITORAL NEA SRL."
       />
@@ -1144,33 +1191,33 @@ function GeneralDashboard({
           tone="cyan"
           icon={HardHat}
           label="Obras activas"
-          value="8"
-          detail="Sin límite configurado"
-          trend="+2 este trimestre"
+          value={String(kpis.activeWorks)}
+          detail={`Costo real ${money(kpis.actualCost, true)}`}
+          trend="Obras en ejecución"
         />
         <KpiCard
           tone="orange"
           icon={CircleDollarSign}
           label="Contratos vigentes"
-          value="$1.240 M"
-          detail="Presupuesto objetivo $1.027 M"
-          trend="Margen est. 15,9%"
+          value={money(kpis.contractTotal, true)}
+          detail={`Presupuesto objetivo ${money(kpis.targetBudget, true)}`}
+          trend={`Margen est. ${percent(kpis.estimatedMargin)}`}
         />
         <KpiCard
           tone="blue"
           icon={ArrowDownLeft}
           label="Pendiente de cobro"
-          value="$145 M"
-          detail="3 certificados en trámite"
-          trend="17 días promedio"
+          value={money(kpis.pendingCollection, true)}
+          detail={`Certificado ${money(kpis.certified, true)}`}
+          trend={`CxP ${money(kpis.accountsPayable, true)}`}
         />
         <KpiCard
           tone="dark"
           icon={WalletCards}
           label="Caja + bancos"
-          value="$124 M"
-          detail="Saldo contable consolidado"
-          trend="+$34 M vs. agosto"
+          value={money(kpis.cashAndBanks, true)}
+          detail={`Impuestos estimados ${money(kpis.estimatedTaxes, true)}`}
+          trend="Saldo contable consolidado"
         />
       </section>
 
