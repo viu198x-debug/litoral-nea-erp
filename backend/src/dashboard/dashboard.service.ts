@@ -672,6 +672,189 @@ export class DashboardService {
         push("documentTotal", "Documentos totales", totalDocuments);
         break;
       }
+      case "technical-workspace": {
+        const now = new Date();
+        const [assigned, activeTasks, overdue, dueSoon] = await Promise.all([
+          this.prisma.technicalTask.count({
+            where: {
+              assignedUserId: userId,
+              status: { notIn: [RecordStatus.CLOSED, RecordStatus.VOID] },
+              OR: [{ workId: null }, { work: { companyId } }],
+            },
+          }),
+          this.prisma.technicalTask.count({
+            where: {
+              assignedUserId: userId,
+              status: RecordStatus.ACTIVE,
+              OR: [{ workId: null }, { work: { companyId } }],
+            },
+          }),
+          this.prisma.technicalTask.count({
+            where: {
+              assignedUserId: userId,
+              status: { notIn: [RecordStatus.CLOSED, RecordStatus.VOID] },
+              dueAt: { lt: now },
+              OR: [{ workId: null }, { work: { companyId } }],
+            },
+          }),
+          this.prisma.technicalTask.count({
+            where: {
+              assignedUserId: userId,
+              status: { notIn: [RecordStatus.CLOSED, RecordStatus.VOID] },
+              dueAt: { gte: now, lte: next30 },
+              OR: [{ workId: null }, { work: { companyId } }],
+            },
+          }),
+        ]);
+        push("techAssigned", "Tareas técnicas abiertas", assigned);
+        push("techActive", "En ejecución", activeTasks);
+        push("techOverdue", "Vencidas", overdue, "number", overdue ? "danger" : "positive");
+        push("techDueSoon", "Vencen en 30 días", dueSoon, "number", dueSoon ? "warning" : "positive");
+        break;
+      }
+      case "notifications": {
+        const [unread, critical, pendingEmail, pendingPush] = await Promise.all([
+          this.prisma.notification.count({ where: { userId, readAt: null } }),
+          this.prisma.notification.count({ where: { userId, readAt: null, severity: { in: ["HIGH", "CRITICAL"] } } }),
+          this.prisma.notificationDelivery.count({
+            where: { notification: { userId }, channel: "EMAIL", status: "PENDING" },
+          }),
+          this.prisma.notificationDelivery.count({
+            where: { notification: { userId }, channel: "PUSH", status: "PENDING" },
+          }),
+        ]);
+        push("notifUnread", "Sin leer", unread, "number", unread ? "warning" : "positive");
+        push("notifCritical", "Alta / crítica", critical, "number", critical ? "danger" : "positive");
+        push("notifEmail", "Email pendientes de envío", pendingEmail);
+        push("notifPush", "Push pendientes de envío", pendingPush);
+        break;
+      }
+      case "personnel-control": {
+        const dayStart = new Date();
+        dayStart.setUTCHours(0, 0, 0, 0);
+        const dayEnd = new Date(dayStart.getTime() + 86_400_000);
+        const [assignedEmployees, attendanceToday, absences, overtime] = await Promise.all([
+          this.prisma.employeeWorkAssignment.count({
+            where: {
+              endDate: null,
+              ...(restrictToAssignedWorks ? { work: workFilter } : {}),
+            },
+          }),
+          this.prisma.attendanceRecord.count({
+            where: {
+              date: { gte: dayStart, lt: dayEnd },
+              ...(restrictToAssignedWorks ? { OR: [{ workId: null }, { work: workFilter }] } : {}),
+            },
+          }),
+          this.prisma.attendanceRecord.count({
+            where: {
+              date: { gte: dayStart, lt: dayEnd },
+              attendanceType: { in: ["ABSENT", "SICK", "ACCIDENT", "LEAVE"] },
+              ...(restrictToAssignedWorks ? { OR: [{ workId: null }, { work: workFilter }] } : {}),
+            },
+          }),
+          this.prisma.attendanceRecord.aggregate({
+            where: {
+              date: { gte: dayStart, lt: dayEnd },
+              ...(restrictToAssignedWorks ? { OR: [{ workId: null }, { work: workFilter }] } : {}),
+            },
+            _sum: { overtimeHours: true },
+          }),
+        ]);
+        push("personnelAssigned", "Personal asignado", assignedEmployees);
+        push("attendanceToday", "Registros de asistencia hoy", attendanceToday);
+        push("absencesToday", "Ausencias / novedades hoy", absences, "number", absences ? "warning" : "positive");
+        push("overtimeToday", "Horas extra registradas hoy", amount(overtime._sum.overtimeHours), "number");
+        break;
+      }
+      case "safety": {
+        const [openIncidents, criticalIncidents, credentialsDue, inspectionsOpen] = await Promise.all([
+          this.prisma.safetyIncident.count({
+            where: {
+              status: { notIn: [RecordStatus.CLOSED, RecordStatus.VOID] },
+              ...(restrictToAssignedWorks ? { OR: [{ workId: null }, { work: workFilter }] } : {}),
+            },
+          }),
+          this.prisma.safetyIncident.count({
+            where: {
+              status: { notIn: [RecordStatus.CLOSED, RecordStatus.VOID] },
+              severity: { in: ["HIGH", "CRITICAL"] },
+              ...(restrictToAssignedWorks ? { OR: [{ workId: null }, { work: workFilter }] } : {}),
+            },
+          }),
+          this.prisma.safetyCredential.count({
+            where: { status: "ACTIVE", expiresAt: { lte: next30 } },
+          }),
+          this.prisma.safetyInspection.count({
+            where: {
+              status: { notIn: [RecordStatus.CLOSED, RecordStatus.VOID] },
+              ...(restrictToAssignedWorks ? { OR: [{ workId: null }, { work: workFilter }] } : {}),
+            },
+          }),
+        ]);
+        push("safetyIncidents", "Incidentes abiertos", openIncidents, "number", openIncidents ? "warning" : "positive");
+        push("safetyCritical", "Incidentes alta/crítica", criticalIncidents, "number", criticalIncidents ? "danger" : "positive");
+        push("safetyCredentialsDue", "Aptos / credenciales ≤30 días", credentialsDue, "number", credentialsDue ? "warning" : "positive");
+        push("safetyInspections", "Inspecciones pendientes", inspectionsOpen, "number", inspectionsOpen ? "warning" : "positive");
+        break;
+      }
+      case "assets": {
+        const [activeAssets, mobileAssets, fixedAssets, dueChecks] = await Promise.all([
+          this.prisma.generalAsset.count({
+            where: {
+              status: "ACTIVE",
+              ...(restrictToAssignedWorks ? { OR: [{ workId: null }, { work: workFilter }] } : {}),
+            },
+          }),
+          this.prisma.generalAsset.count({
+            where: {
+              status: "ACTIVE",
+              mobilityClass: "MOBILE",
+              ...(restrictToAssignedWorks ? { OR: [{ workId: null }, { work: workFilter }] } : {}),
+            },
+          }),
+          this.prisma.generalAsset.count({
+            where: {
+              status: "ACTIVE",
+              mobilityClass: "FIXED",
+              ...(restrictToAssignedWorks ? { OR: [{ workId: null }, { work: workFilter }] } : {}),
+            },
+          }),
+          this.prisma.generalAsset.count({
+            where: {
+              status: "ACTIVE",
+              OR: [
+                { warrantyDue: { lte: next30 } },
+                { calibrationDue: { lte: next30 } },
+              ],
+              ...(restrictToAssignedWorks ? { AND: [{ OR: [{ workId: null }, { work: workFilter }] }] } : {}),
+            },
+          }),
+        ]);
+        push("assetsActive", "Activos inventariados", activeAssets);
+        push("assetsMobile", "Móviles", mobileAssets);
+        push("assetsFixed", "No móviles", fixedAssets);
+        push("assetsDue", "Garantía/calibración ≤30 días", dueChecks, "number", dueChecks ? "warning" : "positive");
+        break;
+      }
+      case "stakeholders": {
+        const [totalRoles, clients, contractors, creditors, balances] = await Promise.all([
+          this.prisma.organizationStakeholderRole.count({ where: { active: true } }),
+          this.prisma.organizationStakeholderRole.count({ where: { active: true, roleType: "CLIENT" } }),
+          this.prisma.organizationStakeholderRole.count({ where: { active: true, roleType: { in: ["CONTRACTOR", "SUBCONTRACTOR"] } } }),
+          this.prisma.organizationStakeholderRole.count({ where: { active: true, roleType: "CREDITOR" } }),
+          this.prisma.organizationStakeholderRole.aggregate({
+            where: { active: true },
+            _sum: { accountBalance: true },
+          }),
+        ]);
+        push("stakeholderRoles", "Relaciones activas", totalRoles);
+        push("stakeholderClients", "Comitentes / clientes", clients);
+        push("stakeholderContractors", "Contratistas / subcontratistas", contractors);
+        push("stakeholderCreditors", "Acreedores", creditors);
+        push("stakeholderBalance", "Saldo consolidado", amount(balances._sum.accountBalance), "currency");
+        break;
+      }
       default:
         break;
     }
