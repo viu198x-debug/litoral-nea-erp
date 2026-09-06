@@ -1,0 +1,84 @@
+services:
+  - type: web
+    name: litoral-nea-erp-api-viu198x
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PREFIX
+        value: api/v1
+      - key: FRONTEND_URL
+        value: https://litoral-nea-erp-web-viu198x.onrender.com
+      - key: BACKEND_PUBLIC_URL
+        value: https://litoral-nea-erp-api-viu198x.onrender.com
+      - key: TRUST_PROXY
+        value: "true"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: litoral-nea-erp-db-viu198x
+          property: connectionString
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: CSRF_SECRET
+        generateValue: true
+      - key: JWT_ISSUER
+        value: litoral-nea-erp
+      - key: JWT_AUDIENCE
+        value: litoral-nea-api
+      - key: ACCESS_TOKEN_TTL
+        value: 15m
+      - key: REFRESH_TOKEN_DAYS
+        value: "7"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: MAX_LOGIN_ATTEMPTS
+        value: "5"
+      - key: LOCK_MINUTES
+        value: "15"
+      - key: MAX_ACTIVE_SESSIONS
+        value: "5"
+      - key: RATE_LIMIT_TTL_MS
+        value: "60000"
+      - key: RATE_LIMIT_MAX
+        value: "120"
+      - key: JSON_BODY_LIMIT
+        value: 1mb
+      - key: ALLOW_SELF_APPROVAL
+        value: "false"
+      - key: MAX_UPLOAD_MB
+        value: "50"
+      - key: SEED_DEMO
+        value: "true"
+      - key: SEED_ADMIN_PASSWORD
+        generateValue: true
+      - key: SEED_USER_PASSWORD
+        generateValue: true
+
+  - type: web
+    name: litoral-nea-erp-web-viu198x
+    runtime: static
+    buildCommand: npm ci && npm --workspace frontend run build
+    staticPublishPath: ./frontend/out
+    autoDeploy: true
+    envVars:
+      - key: NEXT_PUBLIC_API_URL
+        value: https://litoral-nea-erp-api-viu198x.onrender.com/api/v1
+      - key: NEXT_PUBLIC_DEMO_MODE
+        value: "false"
+
+databases:
+  - name: litoral-nea-erp-db-viu198x
+    plan: free
+    region: oregon
+    postgresMajorVersion: "16"
+    databaseName: litoral_nea_erp
+    user: litoral_nea
+    ipAllowList: []
