@@ -12,6 +12,7 @@ import type {
   UpdateModuleFieldDto,
 } from "./dto/module-config.dto";
 import type { CreateWorkflowDto, UpdateWorkflowDto } from "./dto/workflow-config.dto";
+import type { CreateManualUserDto } from "./dto/create-manual-user.dto";
 
 const permissionActions = [
   "view",
@@ -48,6 +49,67 @@ export class SystemService {
         },
       },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    });
+  }
+
+  async createManualUser(
+    companyId: string,
+    dto: CreateManualUserDto,
+    actorId: string,
+  ) {
+    const email = dto.email.trim().toLowerCase();
+    const username = dto.username?.trim().toLowerCase() || await this.availableUsername(email);
+    const [existingEmail, existingUsername, role] = await Promise.all([
+      this.prisma.user.findFirst({ where: { companyId, email, deletedAt: null }, select: { id: true } }),
+      this.prisma.user.findUnique({ where: { username }, select: { id: true } }),
+      this.prisma.role.findUnique({ where: { code: dto.roleCode } }),
+    ]);
+    if (existingEmail) throw new BadRequestException("Ya existe un usuario con ese correo");
+    if (existingUsername) throw new BadRequestException("El nombre de usuario ya está en uso");
+    if (!role) throw new BadRequestException("El rol seleccionado no existe");
+
+    const passwordHash = await bcrypt.hash(dto.password, 12);
+    return this.prisma.$transaction(async (tx) => {
+      const created = await tx.user.create({
+        data: {
+          companyId,
+          username,
+          email,
+          firstName: dto.firstName.trim(),
+          lastName: dto.lastName.trim(),
+          passwordHash,
+          status: dto.status ?? UserStatus.ACTIVE,
+          roles: {
+            create: { roleId: role.id },
+          },
+        },
+        select: {
+          id: true,
+          username: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          status: true,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          userId: actorId,
+          action: AuditAction.CREATE,
+          module: "system",
+          entityType: "user",
+          entityId: created.id,
+          after: {
+            username: created.username,
+            email: created.email,
+            firstName: created.firstName,
+            lastName: created.lastName,
+            roleCode: dto.roleCode,
+            status: created.status,
+          },
+        },
+      });
+      return created;
     });
   }
 
