@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { AuditAction, Prisma, RegistrationStatus, UserStatus } from "@prisma/client";
+import { AuditAction, OrganizationType, Prisma, RegistrationStatus, UserStatus, WorkStatus } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
@@ -13,6 +13,7 @@ import type {
 } from "./dto/module-config.dto";
 import type { CreateWorkflowDto, UpdateWorkflowDto } from "./dto/workflow-config.dto";
 import type { CreateManualUserDto } from "./dto/create-manual-user.dto";
+import type { StarterImportDto } from "./dto/starter-import.dto";
 
 const permissionActions = [
   "view",
@@ -565,6 +566,283 @@ export class SystemService {
       });
       return reviewed;
     });
+  }
+
+
+  async starterImport(
+    companyId: string,
+    actorId: string,
+    dto: StarterImportDto,
+  ) {
+    const textValue = (value: unknown) =>
+      value === undefined || value === null ? "" : String(value).trim();
+    const numberValue = (value: unknown) => {
+      const normalized = textValue(value).replace(/\./g, "").replace(",", ".");
+      const parsed = Number(normalized);
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const dateValue = (value: unknown) => {
+      const raw = textValue(value);
+      if (!raw) return undefined;
+      const parsed = new Date(raw);
+      return Number.isNaN(parsed.getTime()) ? undefined : parsed;
+    };
+
+    const results: Array<{ row: number; status: "created" | "updated" | "skipped"; key: string; message?: string }> = [];
+
+    for (const [index, row] of dto.rows.entries()) {
+      try {
+        if (dto.kind === "employees") {
+          const employeeNumber = textValue(row.employeeNumber || row.legajo || row.codigo);
+          const fullName = textValue(row.fullName || row.nombre || row.nombreCompleto);
+          if (!employeeNumber || !fullName) {
+            results.push({ row: index + 2, status: "skipped", key: employeeNumber || fullName || "sin-clave", message: "Falta legajo o nombre" });
+            continue;
+          }
+          const parts = fullName.split(/\s+/);
+          const firstName = parts.shift() ?? fullName;
+          const lastName = parts.join(" ") || "-";
+          const existing = await this.prisma.employee.findUnique({ where: { employeeNumber } });
+          await this.prisma.employee.upsert({
+            where: { employeeNumber },
+            update: {
+              firstName,
+              lastName,
+              taxId: textValue(row.taxId || row.cuil || row.cuit),
+              category: textValue(row.category || row.categoria),
+              position: textValue(row.position || row.puesto),
+              hireDate: dateValue(row.hireDate || row.fechaIngreso) ?? existing?.hireDate ?? new Date(),
+              baseSalary: numberValue(row.baseSalary || row.basico),
+              active: true,
+            },
+            create: {
+              employeeNumber,
+              taxId: textValue(row.taxId || row.cuil || row.cuit),
+              firstName,
+              lastName,
+              category: textValue(row.category || row.categoria),
+              position: textValue(row.position || row.puesto),
+              hireDate: dateValue(row.hireDate || row.fechaIngreso) ?? new Date(),
+              baseSalary: numberValue(row.baseSalary || row.basico),
+            },
+          });
+          results.push({ row: index + 2, status: existing ? "updated" : "created", key: employeeNumber });
+          continue;
+        }
+
+        if (dto.kind === "suppliers") {
+          const legalName = textValue(row.legalName || row.razonSocial || row.nombre);
+          const taxId = textValue(row.taxId || row.cuit);
+          if (!legalName) {
+            results.push({ row: index + 2, status: "skipped", key: taxId || "sin-clave", message: "Falta razón social" });
+            continue;
+          }
+          const existingOrg = taxId
+            ? await this.prisma.organization.findFirst({ where: { taxId, deletedAt: null } })
+            : await this.prisma.organization.findFirst({ where: { legalName, deletedAt: null } });
+          const organization = existingOrg
+            ? await this.prisma.organization.update({
+                where: { id: existingOrg.id },
+                data: {
+                  legalName,
+                  type: OrganizationType.SUPPLIER,
+                  taxId: taxId || undefined,
+                  vatCondition: textValue(row.vatCondition || row.condicionIva),
+                  email: textValue(row.email),
+                  phone: textValue(row.phone || row.telefono),
+                  address: textValue(row.address || row.domicilio),
+                  bankAccount: textValue(row.bankAccount || row.cbu || row.alias),
+                },
+              })
+            : await this.prisma.organization.create({
+                data: {
+                  legalName,
+                  type: OrganizationType.SUPPLIER,
+                  taxId: taxId || undefined,
+                  vatCondition: textValue(row.vatCondition || row.condicionIva),
+                  email: textValue(row.email),
+                  phone: textValue(row.phone || row.telefono),
+                  address: textValue(row.address || row.domicilio),
+                  bankAccount: textValue(row.bankAccount || row.cbu || row.alias),
+                },
+              });
+          const existingSupplier = await this.prisma.supplier.findUnique({ where: { organizationId: organization.id } });
+          await this.prisma.supplier.upsert({
+            where: { organizationId: organization.id },
+            update: { active: true, accountBalance: numberValue(row.accountBalance || row.saldo) },
+            create: { organizationId: organization.id, accountBalance: numberValue(row.accountBalance || row.saldo) },
+          });
+          results.push({ row: index + 2, status: existingSupplier ? "updated" : "created", key: taxId || legalName });
+          continue;
+        }
+
+        if (dto.kind === "vehicles") {
+          const plate = textValue(row.plate || row.dominio || row.patente).toUpperCase();
+          if (!plate) {
+            results.push({ row: index + 2, status: "skipped", key: "sin-dominio", message: "Falta dominio/patente" });
+            continue;
+          }
+          const workCode = textValue(row.workCode || row.obra || row.codigoObra);
+          const work = workCode
+            ? await this.prisma.work.findFirst({ where: { companyId, code: workCode, deletedAt: null }, select: { id: true } })
+            : null;
+          const existing = await this.prisma.vehicle.findUnique({ where: { plate } });
+          await this.prisma.vehicle.upsert({
+            where: { plate },
+            update: {
+              brand: textValue(row.brand || row.marca),
+              model: textValue(row.model || row.modelo),
+              year: Math.trunc(numberValue(row.year || row.anio)),
+              odometerKm: Math.trunc(numberValue(row.odometerKm || row.kilometraje)),
+              insuranceDue: dateValue(row.insuranceDue || row.vencimientoSeguro),
+              inspectionDue: dateValue(row.inspectionDue || row.vencimientoRto),
+              workId: work?.id,
+              active: true,
+            },
+            create: {
+              plate,
+              brand: textValue(row.brand || row.marca),
+              model: textValue(row.model || row.modelo),
+              year: Math.trunc(numberValue(row.year || row.anio)) || new Date().getFullYear(),
+              odometerKm: Math.trunc(numberValue(row.odometerKm || row.kilometraje)),
+              insuranceDue: dateValue(row.insuranceDue || row.vencimientoSeguro),
+              inspectionDue: dateValue(row.inspectionDue || row.vencimientoRto),
+              workId: work?.id,
+            },
+          });
+          results.push({ row: index + 2, status: existing ? "updated" : "created", key: plate });
+          continue;
+        }
+
+        if (dto.kind === "assets") {
+          const code = textValue(row.code || row.codigo);
+          const description = textValue(row.description || row.descripcion);
+          if (!code || !description) {
+            results.push({ row: index + 2, status: "skipped", key: code || description || "sin-clave", message: "Falta código o descripción" });
+            continue;
+          }
+          const workCode = textValue(row.workCode || row.obra || row.codigoObra);
+          const work = workCode
+            ? await this.prisma.work.findFirst({ where: { companyId, code: workCode, deletedAt: null }, select: { id: true } })
+            : null;
+          const existing = await this.prisma.generalAsset.findUnique({ where: { code } });
+          await this.prisma.generalAsset.upsert({
+            where: { code },
+            update: {
+              assetType: textValue(row.assetType || row.tipo) || "OTHER",
+              mobilityClass: /no|fijo/i.test(textValue(row.mobilityClass || row.movilidad)) ? "FIXED" : "MOBILE",
+              description,
+              brand: textValue(row.brand || row.marca),
+              model: textValue(row.model || row.modelo),
+              serialNumber: textValue(row.serialNumber || row.serie),
+              acquisitionCost: numberValue(row.acquisitionCost || row.costo),
+              currentValue: numberValue(row.currentValue || row.valorActual),
+              workId: work?.id,
+              location: textValue(row.location || row.ubicacion),
+              status: "ACTIVE",
+              inventoryDate: new Date(),
+            },
+            create: {
+              code,
+              assetType: textValue(row.assetType || row.tipo) || "OTHER",
+              mobilityClass: /no|fijo/i.test(textValue(row.mobilityClass || row.movilidad)) ? "FIXED" : "MOBILE",
+              description,
+              brand: textValue(row.brand || row.marca),
+              model: textValue(row.model || row.modelo),
+              serialNumber: textValue(row.serialNumber || row.serie),
+              acquisitionCost: numberValue(row.acquisitionCost || row.costo),
+              currentValue: numberValue(row.currentValue || row.valorActual),
+              workId: work?.id,
+              location: textValue(row.location || row.ubicacion),
+              inventoryDate: new Date(),
+            },
+          });
+          results.push({ row: index + 2, status: existing ? "updated" : "created", key: code });
+          continue;
+        }
+
+        if (dto.kind === "works") {
+          const code = textValue(row.code || row.codigo);
+          const name = textValue(row.name || row.nombre);
+          const clientName = textValue(row.client || row.comitente || row.cliente);
+          if (!code || !name || !clientName) {
+            results.push({ row: index + 2, status: "skipped", key: code || name || "sin-clave", message: "Falta código, nombre o comitente" });
+            continue;
+          }
+          let client = await this.prisma.organization.findFirst({ where: { legalName: clientName, deletedAt: null } });
+          if (!client) {
+            client = await this.prisma.organization.create({
+              data: { legalName: clientName, type: OrganizationType.PUBLIC_AGENCY },
+            });
+          }
+          const existing = await this.prisma.work.findUnique({ where: { code } });
+          await this.prisma.work.upsert({
+            where: { code },
+            update: {
+              companyId,
+              clientId: client.id,
+              name,
+              city: textValue(row.city || row.ciudad),
+              contractAmount: numberValue(row.contractAmount || row.montoContrato),
+              targetBudget: numberValue(row.targetBudget || row.presupuestoObjetivo),
+              startDate: dateValue(row.startDate || row.fechaInicio) ?? existing?.startDate ?? new Date(),
+              contractualEndDate: dateValue(row.contractualEndDate || row.fechaFin),
+              responsibleName: textValue(row.responsibleName || row.responsable),
+              status: WorkStatus.ACTIVE,
+              deletedAt: null,
+            },
+            create: {
+              companyId,
+              clientId: client.id,
+              code,
+              name,
+              status: WorkStatus.ACTIVE,
+              costCenter: textValue(row.costCenter || row.centroCosto) || `CC-${code}`,
+              city: textValue(row.city || row.ciudad),
+              startDate: dateValue(row.startDate || row.fechaInicio) ?? new Date(),
+              contractualEndDate: dateValue(row.contractualEndDate || row.fechaFin),
+              contractAmount: numberValue(row.contractAmount || row.montoContrato),
+              targetBudget: numberValue(row.targetBudget || row.presupuestoObjetivo),
+              responsibleName: textValue(row.responsibleName || row.responsable),
+            },
+          });
+          results.push({ row: index + 2, status: existing ? "updated" : "created", key: code });
+        }
+      } catch (error) {
+        results.push({
+          row: index + 2,
+          status: "skipped",
+          key: textValue(row.code || row.codigo || row.employeeNumber || row.legajo || row.plate || row.patente || row.taxId || row.cuit) || "sin-clave",
+          message: error instanceof Error ? error.message : "Error de importación",
+        });
+      }
+    }
+
+    await this.prisma.auditLog.create({
+      data: {
+        userId: actorId,
+        action: AuditAction.CREATE,
+        module: "system",
+        entityType: "starter-import",
+        entityId: `${dto.kind}:${Date.now()}`,
+        after: {
+          kind: dto.kind,
+          total: dto.rows.length,
+          created: results.filter((item) => item.status === "created").length,
+          updated: results.filter((item) => item.status === "updated").length,
+          skipped: results.filter((item) => item.status === "skipped").length,
+        },
+      },
+    });
+
+    return {
+      kind: dto.kind,
+      total: dto.rows.length,
+      created: results.filter((item) => item.status === "created").length,
+      updated: results.filter((item) => item.status === "updated").length,
+      skipped: results.filter((item) => item.status === "skipped").length,
+      results,
+    };
   }
 
   async audit(filters: { module?: string; userId?: string; workId?: string }) {
