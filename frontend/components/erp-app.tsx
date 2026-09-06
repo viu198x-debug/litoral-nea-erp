@@ -1739,17 +1739,18 @@ function ModulePage({
       </section>
       <section className="feature-grid">
         {module.features.map((feature, index) => (
-          <button key={feature} onClick={() => toast.info(`${feature}: vista preparada`)}>
+          <div className="feature-card" key={feature}>
             <span>{String(index + 1).padStart(2, "0")}</span>
             <strong>{feature}</strong>
             <ArrowUpRight size={17} />
-          </button>
+          </div>
         ))}
       </section>
       {module.slug === "system" && (
         <>
           <ModuleConfiguratorPanel />
           <WorkflowConfiguratorPanel />
+          <ManualUserAdminPanel />
           <UserRolesPanel />
           <RegistrationRequestsPanel />
           <section className="security-note">
@@ -2065,6 +2066,169 @@ function WorkflowConfiguratorPanel() {
         <button className="button secondary" type="button" onClick={() => change({ steps: [...selected.steps, { role: "ADMIN_GENERAL", label: "Aprobación final" }] })}><Plus size={16} /> Agregar paso</button>
       </div>
       <div className="workflow-footer"><small>{selected.module} · {selected.code} · todas las modificaciones quedan auditadas</small><button className="button primary" disabled={saving} type="button" onClick={() => void save()}><Check size={16} /> {saving ? "Guardando…" : "Guardar flujo"}</button></div>
+    </section>
+  );
+}
+
+type AdminRoleOption = {
+  code: string;
+  name: string;
+};
+
+function ManualUserAdminPanel() {
+  const [roles, setRoles] = useState<AdminRoleOption[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    username: "",
+    roleCode: "TEC_JEFE_OBRA",
+    password: "",
+    status: "ACTIVE",
+  });
+
+  useEffect(() => {
+    if (demoMode) {
+      setRoles(demoAccounts.map((account) => ({ code: account.roleCode, name: account.role })));
+      return;
+    }
+    void apiFetch("/system/roles")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("No se pudieron cargar los roles");
+        const payload = (await response.json()) as Array<{ code: string; name: string }>;
+        setRoles(payload.map(({ code, name }) => ({ code, name })));
+        if (payload[0]) {
+          setForm((current) =>
+            payload.some((role) => role.code === current.roleCode)
+              ? current
+              : { ...current, roleCode: payload[0].code },
+          );
+        }
+      })
+      .catch((cause) =>
+        toast.error("No se cargaron los roles", {
+          description: cause instanceof Error ? cause.message : "Error de conexión",
+        }),
+      );
+  }, []);
+
+  const update = (key: keyof typeof form, value: string) =>
+    setForm((current) => ({ ...current, [key]: value }));
+
+  const createUser = async () => {
+    if (!form.firstName.trim() || !form.lastName.trim() || !form.email.trim() || !form.password) {
+      toast.error("Completá nombre, apellido, correo y contraseña inicial.");
+      return;
+    }
+    if (form.password.length < 10) {
+      toast.error("La contraseña inicial debe tener al menos 10 caracteres.");
+      return;
+    }
+    setSaving(true);
+    try {
+      if (demoMode) {
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
+      } else {
+        const response = await apiFetch("/system/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            firstName: form.firstName.trim(),
+            lastName: form.lastName.trim(),
+            email: form.email.trim().toLowerCase(),
+            username: form.username.trim() || undefined,
+            roleCode: form.roleCode,
+            password: form.password,
+            status: form.status,
+          }),
+        });
+        if (!response.ok) {
+          const problem = (await response.json().catch(() => null)) as { message?: string | string[] } | null;
+          const message = Array.isArray(problem?.message)
+            ? problem?.message.join(". ")
+            : problem?.message;
+          throw new Error(message ?? "La API rechazó el alta.");
+        }
+      }
+      toast.success("Usuario creado", {
+        description: `${form.firstName.trim()} ${form.lastName.trim()} quedó registrado y auditado.`,
+      });
+      setForm({
+        firstName: "",
+        lastName: "",
+        email: "",
+        username: "",
+        roleCode: roles[0]?.code ?? "TEC_JEFE_OBRA",
+        password: "",
+        status: "ACTIVE",
+      });
+      window.dispatchEvent(new Event("lnea:users-changed"));
+    } catch (cause) {
+      toast.error("No se pudo crear el usuario", {
+        description: cause instanceof Error ? cause.message : "Error no identificado",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <section className="panel registration-panel">
+      <div className="panel-heading">
+        <div>
+          <span className="panel-kicker">Administración de acceso</span>
+          <h2>Alta manual de usuarios</h2>
+        </div>
+        <span className="registration-count">Administrador</span>
+      </div>
+      <div className="dialog-form">
+        <div className="two-fields">
+          <label className="form-field">
+            <span>Nombre *</span>
+            <input value={form.firstName} onChange={(event) => update("firstName", event.target.value)} />
+          </label>
+          <label className="form-field">
+            <span>Apellido *</span>
+            <input value={form.lastName} onChange={(event) => update("lastName", event.target.value)} />
+          </label>
+        </div>
+        <div className="two-fields">
+          <label className="form-field">
+            <span>Correo *</span>
+            <input type="email" value={form.email} onChange={(event) => update("email", event.target.value)} placeholder="usuario@litoralnea.com" />
+          </label>
+          <label className="form-field">
+            <span>Usuario</span>
+            <input value={form.username} onChange={(event) => update("username", event.target.value)} placeholder="Se genera desde el correo si se deja vacío" />
+          </label>
+        </div>
+        <div className="two-fields">
+          <label className="form-field">
+            <span>Rol *</span>
+            <select value={form.roleCode} onChange={(event) => update("roleCode", event.target.value)}>
+              {roles.map((role) => <option key={role.code} value={role.code}>{role.name}</option>)}
+            </select>
+          </label>
+          <label className="form-field">
+            <span>Estado inicial</span>
+            <select value={form.status} onChange={(event) => update("status", event.target.value)}>
+              <option value="ACTIVE">Activo</option>
+              <option value="DISABLED">Deshabilitado</option>
+            </select>
+          </label>
+        </div>
+        <label className="form-field">
+          <span>Contraseña inicial *</span>
+          <input type="password" autoComplete="new-password" value={form.password} onChange={(event) => update("password", event.target.value)} placeholder="Mínimo 10 caracteres" />
+        </label>
+        <div className="workflow-footer">
+          <small>El alta registra usuario creador, fecha y rol en auditoría. La contraseña nunca se guarda en el log.</small>
+          <button className="button primary" type="button" disabled={saving || roles.length === 0} onClick={() => void createUser()}>
+            <Plus size={16} /> {saving ? "Creando…" : "Crear usuario"}
+          </button>
+        </div>
+      </div>
     </section>
   );
 }
