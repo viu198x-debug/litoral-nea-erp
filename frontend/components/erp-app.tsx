@@ -1585,6 +1585,169 @@ function MetricCard({
   );
 }
 
+type SectorDashboardCard = {
+  key: string;
+  label: string;
+  value: number;
+  format: "number" | "currency" | "percent" | "liters";
+  tone?: "positive" | "warning" | "danger";
+};
+
+type SectorDashboardPayload = {
+  module: string;
+  generatedAt: string;
+  authorized: boolean;
+  cards: SectorDashboardCard[];
+  alerts: Array<{
+    id: string;
+    severity: string;
+    title: string;
+    description?: string | null;
+    dueAt?: string | null;
+    workCode?: string | null;
+    workName?: string | null;
+  }>;
+  byWork: Array<{
+    workId?: string | null;
+    code: string;
+    name: string;
+    count: number;
+    amount: number;
+  }>;
+};
+
+const formatSectorValue = (card: SectorDashboardCard) => {
+  if (card.format === "currency") return money(card.value, card.value >= 1_000_000);
+  if (card.format === "percent") return percent(card.value);
+  if (card.format === "liters") {
+    return `${new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(card.value)} L`;
+  }
+  return new Intl.NumberFormat("es-AR", { maximumFractionDigits: 1 }).format(card.value);
+};
+
+function SectorDashboardPanel({ module }: { module: ModuleDefinition }) {
+  const [data, setData] = useState<SectorDashboardPayload | null>(null);
+  const [loading, setLoading] = useState(!demoMode);
+
+  useEffect(() => {
+    if (demoMode) return;
+    const controller = new AbortController();
+    setLoading(true);
+    void apiFetch(`/dashboard/sector/${module.slug}`, { signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("No se pudo cargar el tablero sectorial");
+        return response.json() as Promise<SectorDashboardPayload>;
+      })
+      .then((payload) => setData(payload))
+      .catch((cause) => {
+        if ((cause as { name?: string }).name !== "AbortError") {
+          toast.error("No se cargó el dashboard del sector", {
+            description: cause instanceof Error ? cause.message : "Error de conexión",
+          });
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [module.slug]);
+
+  if (demoMode) {
+    return (
+      <section className="sector-dashboard-shell">
+        <div className="sector-dashboard-heading">
+          <div>
+            <span className="panel-kicker">Tablero sectorial</span>
+            <h2>{module.label}</h2>
+          </div>
+          <small>Modo demostración</small>
+        </div>
+        <div className="sector-kpi-grid">
+          <article><small>Registros</small><strong>—</strong><p>Conectar API para datos reales</p></article>
+          <article><small>Pendientes</small><strong>—</strong><p>Sin datos productivos</p></article>
+          <article><small>Actividad 30 días</small><strong>—</strong><p>Sin datos productivos</p></article>
+          <article><small>Documentos</small><strong>—</strong><p>Sin datos productivos</p></article>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section className="sector-dashboard-shell">
+      <div className="sector-dashboard-heading">
+        <div>
+          <span className="panel-kicker">Tablero sectorial</span>
+          <h2>Control de {module.label}</h2>
+        </div>
+        <small>
+          {loading
+            ? "Actualizando…"
+            : data?.generatedAt
+              ? `Corte ${new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(data.generatedAt))}`
+              : "Sin datos"}
+        </small>
+      </div>
+
+      {!data?.authorized && !loading ? (
+        <div className="sector-dashboard-empty">El perfil actual no tiene autorización para consultar este tablero.</div>
+      ) : (
+        <>
+          <div className="sector-kpi-grid">
+            {(data?.cards ?? []).map((card) => (
+              <article className={card.tone ? `tone-${card.tone}` : ""} key={card.key}>
+                <small>{card.label}</small>
+                <strong>{formatSectorValue(card)}</strong>
+                <p>{card.tone === "danger" ? "Requiere intervención" : card.tone === "warning" ? "Revisar pendiente" : "Dato consolidado"}</p>
+              </article>
+            ))}
+            {loading && Array.from({ length: 6 }).map((_, index) => (
+              <article className="sector-kpi-loading" key={index}>
+                <small>Cargando indicador</small>
+                <strong>…</strong>
+                <p>Consultando base de datos</p>
+              </article>
+            ))}
+          </div>
+
+          {(data?.byWork.length || data?.alerts.length) ? (
+            <div className="sector-dashboard-detail">
+              <article className="panel">
+                <div className="panel-heading">
+                  <div><span className="panel-kicker">Centros de costo</span><h2>Distribución por obra</h2></div>
+                </div>
+                <div className="sector-work-list">
+                  {data?.byWork.length ? data.byWork.map((row) => (
+                    <div key={row.workId ?? row.code}>
+                      <span><strong>{row.code}</strong><small>{row.name}</small></span>
+                      <span><strong>{row.amount ? money(row.amount, true) : `${row.count} reg.`}</strong><small>{row.count} registros</small></span>
+                    </div>
+                  )) : <p className="sector-dashboard-empty">Todavía no hay movimientos imputados por obra.</p>}
+                </div>
+              </article>
+              <article className="panel">
+                <div className="panel-heading">
+                  <div><span className="panel-kicker orange">Control</span><h2>Alertas del sector</h2></div>
+                </div>
+                <div className="sector-alert-list">
+                  {data?.alerts.length ? data.alerts.map((alert) => (
+                    <div key={alert.id}>
+                      <i className={alert.severity.toLowerCase()} />
+                      <span>
+                        <strong>{alert.title}</strong>
+                        <small>{[alert.workCode, alert.description].filter(Boolean).join(" · ")}</small>
+                      </span>
+                    </div>
+                  )) : <p className="sector-dashboard-empty">Sin alertas abiertas para este sector.</p>}
+                </div>
+              </article>
+            </div>
+          ) : null}
+        </>
+      )}
+    </section>
+  );
+}
+
 function ModulePage({
   module,
   onCreate,
@@ -1713,15 +1876,7 @@ function ModulePage({
           {onCreate ? "Registración habilitada" : "Sólo consulta"}
         </span>
       </section>
-      <section className="module-summary-grid">
-        <article className="module-highlight">
-          <span className="module-large-icon"><Icon size={28} /></span>
-          <div><small>Registros activos</small><strong>{module.slug === "system" ? "7 usuarios" : "24"}</strong><p>Actualización en tiempo real</p></div>
-        </article>
-        <article><small>Pendientes</small><strong>4</strong><p>Requieren intervención</p></article>
-        <article><small>Este mes</small><strong>+12</strong><p>Nuevos movimientos</p></article>
-        <article><small>Documentos</small><strong>38</strong><p>Con historial de versión</p></article>
-      </section>
+      <SectorDashboardPanel module={module} />
       <section className="panel module-panel">
         <div className="module-toolbar">
           <div className="inline-search"><Search size={17} /><input value={localSearch} onChange={(event) => setLocalSearch(event.target.value)} placeholder="Buscar registros…" aria-label="Buscar registros" /></div>
