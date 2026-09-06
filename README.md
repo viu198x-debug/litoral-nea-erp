@@ -1,3 +1,7 @@
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/viu198x-debug/litoral-nea-erp)
+
+> El Blueprint `render.yaml` crea el frontend, la API NestJS y PostgreSQL. Las contraseñas iniciales del seed se generan como secretos en Render y no están hardcodeadas en el repositorio.
+
 # LITORAL NEA ERP
 
 Aplicación web integral para **LITORAL NEA SRL**, orientada al control de obras,
