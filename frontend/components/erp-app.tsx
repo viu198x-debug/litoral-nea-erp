@@ -158,8 +158,27 @@ const canUseModule = (user: DemoUser, moduleSlug: string) =>
 const canCreateInModule = (user: DemoUser, moduleSlug: string) =>
   user.allowedCreateModules.includes("*") || user.allowedCreateModules.includes(moduleSlug);
 
+const managerProfile: DemoUser = {
+  name: "Gerente de Empresa",
+  email: "",
+  role: "Gerente de Empresa",
+  roleCode: "GERENTE_EMPRESA",
+  allowedModules: modules.map((module) => module.slug).filter((slug) => slug !== "system"),
+  allowedActions: ["view", "create", "modify", "approve", "void", "download", "export", "admin"],
+  allowedCreateModules: modules.map((module) => module.slug).filter((slug) => slug !== "system"),
+  assignedWorks: [],
+  responsibilities: [
+    "Dirección integral de la operación de la empresa",
+    "Aprobaciones comerciales, financieras y operativas",
+    "Seguimiento de obras, personal, compras, contabilidad e impuestos",
+    "Reportes gerenciales y control de gestión",
+  ],
+};
+
 const profileForRoleCodes = (roleCodes: string[]) =>
-  demoAccounts.find((account) => roleCodes.includes(account.roleCode)) ?? demoAccounts[0];
+  roleCodes.includes("GERENTE_EMPRESA")
+    ? managerProfile
+    : demoAccounts.find((account) => roleCodes.includes(account.roleCode)) ?? demoAccounts[0];
 
 function csrfTokenFromCookie() {
   if (typeof document === "undefined") return null;
