@@ -730,6 +730,10 @@ model Vehicle {
   fuelLogs          FuelLog[]
   driverAssignments Driver[]
   maintenanceOrders MaintenanceOrder[]
+  maintenancePlans  MaintenancePlan[]
+  fuelEstimates     FuelEstimate[]
+  insurancePolicies InsurancePolicy[]
+  unexpectedTasks   UnexpectedTask[]
 }
 
 model Driver {
