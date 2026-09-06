@@ -19,6 +19,7 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ClipboardCheck,
   CircleDollarSign,
   Construction,
   ContactRound,
@@ -102,6 +103,9 @@ import type {
 const iconMap: Record<string, LucideIcon> = {
   LayoutDashboard,
   HardHat,
+  ClipboardCheck,
+  Bell,
+  ShieldCheck,
   Building2,
   DraftingCompass,
   FolderArchive,
