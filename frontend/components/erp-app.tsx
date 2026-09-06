@@ -262,20 +262,25 @@ export function ErpApp() {
           icon: module.icon,
           summary: module.summary,
           features: module.fields.map((field) => field.label),
-          recordDefinition: {
-            codePrefix: module.slug.replace(/[^a-z0-9]/gi, "").slice(0, 5).toUpperCase() || "REG",
-            titleLabel: "Descripción principal",
-            requiresWork: module.requiresWork,
-            fields: module.fields
-              .filter((field) => field.active)
-              .map((field) => ({
-                key: field.fieldKey,
-                label: field.label,
-                type: field.fieldType === "datetime" ? "datetime-local" : field.fieldType as RecordFieldDefinition["type"],
-                required: field.required,
-                options: field.options,
-              })),
-          },
+          recordDefinition: module.fields.some((field) => field.active)
+            ? {
+                codePrefix: module.slug.replace(/[^a-z0-9]/gi, "").slice(0, 5).toUpperCase() || "REG",
+                titleLabel: "Descripción principal",
+                requiresWork: module.requiresWork,
+                fields: module.fields
+                  .filter((field) => field.active)
+                  .map((field) => ({
+                    key: field.fieldKey,
+                    label: field.label,
+                    type: field.fieldType === "datetime" ? "datetime-local" : field.fieldType as RecordFieldDefinition["type"],
+                    required: field.required,
+                    options: field.options,
+                  })),
+              }
+            : recordDefinitions[module.slug] ?? {
+                ...fallbackRecordDefinition,
+                requiresWork: module.requiresWork,
+              },
         })));
         setUser((current) => current ? {
           ...current,
