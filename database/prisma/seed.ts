@@ -295,7 +295,16 @@ async function main() {
       update: {},
       create: {
         code: "ADMIN_GENERAL",
-        name: "Gerente General / Administrador",
+        name: "Administrador del Sistema",
+        isSystem: true,
+      },
+    }),
+    manager: await prisma.role.upsert({
+      where: { code: "GERENTE_EMPRESA" },
+      update: { name: "Gerente de Empresa" },
+      create: {
+        code: "GERENTE_EMPRESA",
+        name: "Gerente de Empresa",
         isSystem: true,
       },
     }),
@@ -370,6 +379,13 @@ function demoFieldValue(
         permissionId: permission.id,
         allowed: true,
       })),
+      ...allPermissions
+        .filter((permission) => permission.module !== "system")
+        .map((permission) => ({
+          roleId: roles.manager.id,
+          permissionId: permission.id,
+          allowed: true,
+        })),
       ...roleRules.flatMap((rule) =>
         allPermissions
           .filter(
