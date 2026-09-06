@@ -200,10 +200,12 @@ export const recordDefinitions: Record<string, ModuleRecordDefinition> = {
     ["deliveryNote", "Remito", "text"], ["costPerM3", "Costo por m³", "currency", true], ["totalCost", "Costo total", "currency", true]
   )},
   maintenance: { codePrefix: "OT", titleLabel: "Orden de trabajo", amountField: "totalCost", fields: fields(
-    ["maintenanceType", "Tipo", "select", true, ["Preventivo", "Correctivo"]], ["assetType", "Activo", "select", true, ["Vehículo", "Máquina", "Instalación"]],
-    ["asset", "Equipo / dominio", "text", true], ["description", "Trabajo requerido", "textarea", true], ["scheduledAt", "Fecha programada", "date"],
-    ["completedAt", "Fecha de finalización", "date"], ["parts", "Repuestos", "textarea"], ["partsCost", "Costo repuestos", "currency"],
-    ["laborCost", "Costo mano de obra", "currency"], ["totalCost", "Costo total", "currency", true], ["nextServiceAt", "Próximo mantenimiento", "date"]
+    ["maintenanceType", "Tipo", "select", true, ["Preventivo", "Correctivo", "Inspección", "Service programado"]], ["assetType", "Activo", "select", true, ["Vehículo", "Máquina", "Instalación"]],
+    ["asset", "Equipo / dominio", "text", true], ["mechanic", "Mecánico asignado", "text"], ["priority", "Prioridad", "select", true, ["LOW", "NORMAL", "HIGH", "CRITICAL"]],
+    ["description", "Trabajo requerido", "textarea", true], ["scheduledAt", "Fecha programada", "date"], ["completedAt", "Fecha de finalización", "date"],
+    ["odometerKm", "Kilometraje al mantenimiento", "number"], ["hourMeter", "Horómetro al mantenimiento", "number"],
+    ["parts", "Repuestos / detalle", "textarea"], ["partsCost", "Costo repuestos", "currency"], ["laborCost", "Costo mano de obra", "currency"],
+    ["totalCost", "Costo total", "currency", true], ["nextServiceAt", "Próximo mantenimiento", "date"], ["notes", "Observaciones técnicas", "textarea"]
   )},
   mechanics: { codePrefix: "MEC", titleLabel: "Mecánico", fields: fields(
     ["employeeNumber", "Legajo / identificación", "text"], ["fullName", "Nombre completo", "text", true],
