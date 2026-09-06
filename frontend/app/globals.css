@@ -4205,3 +4205,221 @@ a:focus-visible {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Technician workspace and notifications */
+.technical-workspace-live {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.technical-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.technical-summary-strip article {
+  min-height: 84px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: white;
+  padding: 13px;
+}
+
+.technical-summary-strip small {
+  color: #788790;
+  font-size: 0.64rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.technical-summary-strip strong {
+  font-size: 1.35rem;
+  letter-spacing: -0.03em;
+}
+
+.technical-workspace-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  gap: 14px;
+}
+
+.technical-task-list {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+
+.technical-task-list > div {
+  min-height: 68px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid #edf1f3;
+  padding: 10px 14px;
+}
+
+.technical-task-list.compact > div {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.technical-priority {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #87959d;
+}
+
+.technical-priority.high {
+  background: #d79d31;
+}
+
+.technical-priority.critical {
+  background: #cc4d4d;
+}
+
+.technical-priority.low {
+  background: #39a981;
+}
+
+.technical-task-copy {
+  min-width: 0;
+  display: grid;
+}
+
+.technical-task-copy strong {
+  overflow: hidden;
+  font-size: 0.76rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.technical-task-copy small {
+  overflow: hidden;
+  color: #7b8992;
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.technical-task-progress {
+  border-radius: 999px;
+  background: #eef6f8;
+  padding: 5px 8px;
+  color: var(--cyan-dark);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.technical-task-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.technical-task-actions .button {
+  min-height: 34px;
+  padding: 0 10px;
+  font-size: 0.68rem;
+}
+
+.notification-center-live {
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+
+.notification-live-list {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+
+.notification-live-list > div {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #edf1f3;
+  padding: 11px 15px;
+  background: #fbfefe;
+}
+
+.notification-live-list > div.read {
+  background: white;
+  opacity: 0.76;
+}
+
+.notification-live-list i {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #2b9db5;
+}
+
+.notification-live-list i.high {
+  background: #d49a31;
+}
+
+.notification-live-list i.critical {
+  background: #cf4c4c;
+}
+
+.notification-live-list > div > span {
+  min-width: 0;
+  display: grid;
+}
+
+.notification-live-list strong {
+  font-size: 0.78rem;
+}
+
+.notification-live-list small,
+.notification-live-list em {
+  overflow: hidden;
+  color: #71818a;
+  font-size: 0.66rem;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notification-live-list em {
+  margin-top: 2px;
+  color: #96a2a9;
+}
+
+@media (max-width: 1180px) {
+  .technical-summary-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .technical-workspace-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .technical-summary-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .technical-task-list > div {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .technical-task-actions {
+    grid-column: 2 / -1;
+    width: 100%;
+  }
+  .technical-task-actions .button {
+    flex: 1;
+  }
+  .notification-live-list > div {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .notification-live-list > div > .button {
+    grid-column: 2;
+    justify-self: start;
+  }
+}
