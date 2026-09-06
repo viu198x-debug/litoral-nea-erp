@@ -357,6 +357,8 @@ model Work {
   financialMovements FinancialMovement[]
   journalLines       JournalLine[]
   fuelLogs           FuelLog[]
+  vehicles           Vehicle[]
+  machines            Machine[]
   maintenanceOrders  MaintenanceOrder[]
   fuelEstimates      FuelEstimate[]
   insurancePolicies  InsurancePolicy[]
@@ -739,6 +741,7 @@ model Vehicle {
   inspectionDue     DateTime?
   workId            String?
   active            Boolean            @default(true)
+  work              Work?               @relation(fields: [workId], references: [id])
   fuelLogs          FuelLog[]
   driverAssignments Driver[]
   maintenanceOrders MaintenanceOrder[]
@@ -772,6 +775,7 @@ model Machine {
   operatorName      String?
   hourlyCost        Decimal            @default(0) @db.Decimal(18, 2)
   active            Boolean            @default(true)
+  work              Work?               @relation(fields: [workId], references: [id])
   fuelLogs          FuelLog[]
   maintenanceOrders MaintenanceOrder[]
   maintenancePlans  MaintenancePlan[]
@@ -794,6 +798,9 @@ model FuelLog {
   supplier    String?
   costCenter  String?
   createdById String
+  voidedAt    DateTime?
+  voidedById  String?
+  voidReason  String?
   work        Work?    @relation(fields: [workId], references: [id])
   vehicle     Vehicle? @relation(fields: [vehicleId], references: [id])
   machine     Machine? @relation(fields: [machineId], references: [id])
