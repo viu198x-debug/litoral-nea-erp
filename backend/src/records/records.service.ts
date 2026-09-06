@@ -5,6 +5,7 @@ import type { CreateRecordDto } from "./dto/create-record.dto";
 import type { UpdateRecordDto } from "./dto/update-record.dto";
 import { OperationalRecordsService } from "./operational-records.service";
 import { BusinessRecordsService } from "./business-records.service";
+import { ConstructionCoreRecordsService } from "./construction-core-records.service";
 
 @Injectable()
 export class RecordsService {
@@ -12,6 +13,7 @@ export class RecordsService {
     private readonly prisma: PrismaService,
     private readonly operational: OperationalRecordsService,
     private readonly business: BusinessRecordsService,
+    private readonly constructionCore: ConstructionCoreRecordsService,
   ) {}
 
   list(
@@ -24,6 +26,9 @@ export class RecordsService {
     }
     if (this.business.handles(module)) {
       return this.business.list(companyId, module, filters);
+    }
+    if (this.constructionCore.handles(module)) {
+      return this.constructionCore.list(companyId, module, filters);
     }
     if (["assets", "stakeholders", "personnel-control", "safety"].includes(module)) {
       return this.listDomain(companyId, module, filters);
@@ -85,6 +90,9 @@ export class RecordsService {
     if (this.business.handles(module)) {
       return this.business.create(companyId, module, userId, dto);
     }
+    if (this.constructionCore.handles(module)) {
+      return this.constructionCore.create(companyId, module, userId, dto);
+    }
     if (["assets", "stakeholders", "personnel-control", "safety"].includes(module)) {
       return this.createDomain(companyId, module, userId, dto);
     }
@@ -114,6 +122,9 @@ export class RecordsService {
     if (this.business.handles(module)) {
       return this.business.update(companyId, module, id, dto);
     }
+    if (this.constructionCore.handles(module)) {
+      return this.constructionCore.update(companyId, module, id, dto);
+    }
     if (["assets", "stakeholders", "personnel-control", "safety"].includes(module)) {
       return this.updateDomain(companyId, module, id, dto);
     }
@@ -139,6 +150,9 @@ export class RecordsService {
     }
     if (this.business.handles(module)) {
       return this.business.softDelete(companyId, module, id, userId);
+    }
+    if (this.constructionCore.handles(module)) {
+      return this.constructionCore.softDelete(companyId, module, id, userId);
     }
     if (["assets", "stakeholders", "personnel-control", "safety"].includes(module)) {
       return this.softDeleteDomain(companyId, module, id);
