@@ -491,6 +491,7 @@ model DailyReport {
   equipmentCount   Int       @default(0)
   materials        Json      @default("[]")
   observations     String?
+  metadata         Json      @default("{}")
   createdById      String
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
@@ -515,6 +516,7 @@ model Certificate {
   invoiceNumber    String?
   paymentOrder     String?
   collectedAmount  Decimal      @default(0) @db.Decimal(18, 2)
+  metadata         Json         @default("{}")
   status           RecordStatus @default(PENDING)
   createdAt        DateTime     @default(now())
   updatedAt        DateTime     @updatedAt
@@ -536,6 +538,7 @@ model Dossier {
   amount         Decimal           @default(0) @db.Decimal(18, 2)
   paidAmount     Decimal           @default(0) @db.Decimal(18, 2)
   lastMovementAt DateTime?
+  metadata       Json         @default("{}")
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
   deletedAt      DateTime?
@@ -1069,6 +1072,7 @@ model Payroll {
   deductions            Decimal      @default(0) @db.Decimal(18, 2)
   employerContributions Decimal      @default(0) @db.Decimal(18, 2)
   companyCost           Decimal      @db.Decimal(18, 2)
+  metadata              Json         @default("{}")
   status                RecordStatus @default(DRAFT)
   employee              Employee     @relation(fields: [employeeId], references: [id])
   work                  Work?        @relation(fields: [workId], references: [id])
@@ -1086,6 +1090,7 @@ model PerDiem {
   advance     Decimal      @default(0) @db.Decimal(18, 2)
   expenses    Decimal      @default(0) @db.Decimal(18, 2)
   balance     Decimal      @default(0) @db.Decimal(18, 2)
+  metadata    Json         @default("{}")
   status      RecordStatus @default(PENDING)
   employee    Employee     @relation(fields: [employeeId], references: [id])
   work        Work?        @relation(fields: [workId], references: [id])
@@ -1102,6 +1107,7 @@ model Lodging {
   nightlyRate Decimal      @db.Decimal(18, 2)
   total       Decimal      @db.Decimal(18, 2)
   invoice     String?
+  metadata    Json         @default("{}")
   status      RecordStatus @default(PENDING)
   work        Work?        @relation(fields: [workId], references: [id])
 }
@@ -1121,6 +1127,7 @@ model ConcreteOrder {
   driver         String?
   deliveryNote   String?
   costPerM3      Decimal      @db.Decimal(18, 2)
+  metadata       Json         @default("{}")
   status         RecordStatus @default(PENDING)
   work           Work         @relation(fields: [workId], references: [id])
 }
