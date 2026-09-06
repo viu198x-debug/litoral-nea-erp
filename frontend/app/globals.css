@@ -3987,3 +3987,221 @@ a:focus-visible {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+/* Sector dashboards */
+.sector-dashboard-shell {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.sector-dashboard-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sector-dashboard-heading h2 {
+  margin: 4px 0 0;
+  font-size: 1.08rem;
+  letter-spacing: -0.02em;
+}
+
+.sector-dashboard-heading > small {
+  color: #7b8992;
+  font-size: 0.7rem;
+}
+
+.sector-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sector-kpi-grid article {
+  min-height: 118px;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: white;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(17, 24, 32, 0.035);
+}
+
+.sector-kpi-grid article small {
+  color: #75858e;
+  font-size: 0.68rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sector-kpi-grid article strong {
+  overflow-wrap: anywhere;
+  font-size: clamp(1.15rem, 2.2vw, 1.7rem);
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+}
+
+.sector-kpi-grid article p {
+  margin: 0;
+  color: #86939a;
+  font-size: 0.66rem;
+}
+
+.sector-kpi-grid article.tone-positive {
+  border-color: #cce9df;
+  background: #f8fcfa;
+}
+
+.sector-kpi-grid article.tone-warning {
+  border-color: #f0dfbd;
+  background: #fffbf2;
+}
+
+.sector-kpi-grid article.tone-danger {
+  border-color: #efd0d0;
+  background: #fff8f8;
+}
+
+.sector-kpi-grid article.tone-danger strong {
+  color: #a13d3d;
+}
+
+.sector-kpi-grid article.tone-warning strong {
+  color: #94600d;
+}
+
+.sector-kpi-loading {
+  opacity: 0.65;
+}
+
+.sector-dashboard-detail {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 14px;
+}
+
+.sector-work-list,
+.sector-alert-list {
+  display: grid;
+  border-top: 1px solid var(--line);
+}
+
+.sector-work-list > div,
+.sector-alert-list > div {
+  min-height: 58px;
+  display: grid;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid #edf1f3;
+  padding: 10px 16px;
+}
+
+.sector-work-list > div {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.sector-work-list span,
+.sector-alert-list span {
+  min-width: 0;
+  display: grid;
+}
+
+.sector-work-list strong,
+.sector-alert-list strong {
+  font-size: 0.76rem;
+}
+
+.sector-work-list small,
+.sector-alert-list small {
+  overflow: hidden;
+  color: #7b8992;
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sector-alert-list > div {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.sector-alert-list i {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #d8a13c;
+}
+
+.sector-alert-list i.high,
+.sector-alert-list i.critical,
+.sector-alert-list i.danger {
+  background: #cf4b4b;
+}
+
+.sector-alert-list i.low,
+.sector-alert-list i.info {
+  background: #2c9eb7;
+}
+
+.sector-dashboard-empty {
+  margin: 0;
+  padding: 18px;
+  color: #7b8992;
+  font-size: 0.76rem;
+}
+
+.feature-grid .feature-card {
+  min-height: 72px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: white;
+  padding: 12px 14px;
+}
+
+.feature-grid .feature-card > span {
+  color: #a2afb6;
+  font: 0.65rem/1 ui-monospace, monospace;
+}
+
+.feature-grid .feature-card strong {
+  font-size: 0.76rem;
+}
+
+.feature-grid .feature-card svg {
+  color: var(--cyan-dark);
+}
+
+@media (max-width: 1240px) {
+  .sector-kpi-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .sector-dashboard-detail {
+    grid-template-columns: 1fr;
+  }
+  .sector-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .sector-dashboard-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .sector-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
