@@ -1,5 +1,7 @@
 name: ERP CI
 
+# Validates the deployable ERP main branch
+
 on:
   push:
     branches: [main]
