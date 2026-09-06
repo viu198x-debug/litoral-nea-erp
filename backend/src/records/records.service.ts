@@ -851,7 +851,7 @@ export class RecordsService {
       select: { id: true },
     });
     if (byCode) return byCode.id;
-    const parts = raw.replace(/^[^·]+·s*/, "").trim().split(/s+/);
+    const parts = raw.replace(/^[^·]+·\\s*/, "").trim().split(/\\s+/);
     const firstName = parts[0];
     const lastName = parts.slice(1).join(" ");
     const byName = await this.prisma.employee.findFirst({
