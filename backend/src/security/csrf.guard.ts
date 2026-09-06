@@ -31,12 +31,13 @@ export class CsrfGuard implements CanActivate {
     const request = context.switchToHttp().getRequest<Request>();
     if (SAFE_METHODS.has(request.method)) return true;
 
-    if (request.get("sec-fetch-site") === "cross-site") {
-      throw new ForbiddenException({ code: "CSRF_INVALID", message: "Solicitud cruzada bloqueada" });
-    }
     const origin = request.get("origin");
-    if (origin && !this.allowedOrigins.has(origin)) {
+    const isAllowedOrigin = Boolean(origin && this.allowedOrigins.has(origin));
+    if (origin && !isAllowedOrigin) {
       throw new ForbiddenException({ code: "CSRF_INVALID", message: "Origen no autorizado" });
+    }
+    if (request.get("sec-fetch-site") === "cross-site" && !isAllowedOrigin) {
+      throw new ForbiddenException({ code: "CSRF_INVALID", message: "Solicitud cruzada bloqueada" });
     }
 
     const names = this.csrf.cookieNames;
