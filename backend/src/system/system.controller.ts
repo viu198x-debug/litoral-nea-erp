@@ -17,6 +17,7 @@ import {
   UpdateModuleFieldDto,
 } from "./dto/module-config.dto";
 import { CreateWorkflowDto, UpdateWorkflowDto } from "./dto/workflow-config.dto";
+import { CreateManualUserDto } from "./dto/create-manual-user.dto";
 
 @Controller("system")
 @RequirePermission("system", "admin")
@@ -26,6 +27,14 @@ export class SystemController {
   @Get("users")
   users(@CurrentUser() user: AuthUser) {
     return this.system.users(user.companyId);
+  }
+
+  @Post("users")
+  createUser(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateManualUserDto,
+  ) {
+    return this.system.createManualUser(user.companyId, dto, user.id);
   }
 
   @Patch("users/:id/status")
