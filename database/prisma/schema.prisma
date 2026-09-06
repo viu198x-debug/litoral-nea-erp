@@ -119,6 +119,10 @@ model User {
   sessions              Session[]
   passwordResets        PasswordReset[]
   assignedUnexpectedTasks UnexpectedTask[]
+  technicalTasks        TechnicalTask[] @relation("TechnicalAssignee")
+  reviewedTechnicalTasks TechnicalTask[] @relation("TechnicalReviewer")
+  notifications         Notification[]
+  notificationPreferences NotificationPreference[]
   workMemberships       WorkMember[]
   externalIdentities    ExternalIdentity[]
   reviewedRegistrations RegistrationRequest[] @relation("RegistrationReviewer")
@@ -300,6 +304,7 @@ model Organization {
   deletedAt    DateTime?
   works        Work[]
   supplier     Supplier?
+  stakeholderRoles OrganizationStakeholderRole[]
 
   @@index([type, legalName])
 }
@@ -356,6 +361,13 @@ model Work {
   fuelEstimates      FuelEstimate[]
   insurancePolicies  InsurancePolicy[]
   unexpectedTasks    UnexpectedTask[]
+  technicalTasks     TechnicalTask[]
+  employeeAssignments EmployeeWorkAssignment[]
+  attendanceRecords  AttendanceRecord[]
+  safetyIncidents    SafetyIncident[]
+  safetyInspections  SafetyInspection[]
+  assets             GeneralAsset[]
+  stakeholderRoles   OrganizationStakeholderRole[]
   payrolls           Payroll[]
   perDiems           PerDiem[]
   lodgings           Lodging[]
@@ -1027,6 +1039,13 @@ model Employee {
   perDiems       PerDiem[]
   mechanic       Mechanic?
   unexpectedTasks UnexpectedTask[]
+  workAssignments EmployeeWorkAssignment[]
+  attendanceRecords AttendanceRecord[]
+  safetyCredentials SafetyCredential[]
+  ppeIssues       PPEIssue[]
+  trainingRecords SafetyTraining[]
+  safetyIncidents SafetyIncident[]
+  assignedAssets  GeneralAsset[]
 }
 
 model Payroll {
@@ -1199,4 +1218,263 @@ model AuditLog {
   @@index([module, entityType, entityId])
   @@index([userId, createdAt])
   @@index([workId, createdAt])
+
+model Notification {
+  id          String    @id @default(cuid())
+  userId      String
+  type        String
+  title       String
+  message     String
+  severity    String    @default("INFO")
+  module      String?
+  entityType  String?
+  entityId    String?
+  actionUrl   String?
+  readAt      DateTime?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries  NotificationDelivery[]
+
+  @@index([userId, readAt, createdAt])
+  @@index([module, entityType, entityId])
+}
+
+model NotificationDelivery {
+  id             String       @id @default(cuid())
+  notificationId String
+  channel        String
+  destination    String?
+  status         String       @default("PENDING")
+  attemptedAt    DateTime?
+  deliveredAt    DateTime?
+  error          String?
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@index([status, channel])
+}
+
+model NotificationPreference {
+  id          String  @id @default(cuid())
+  userId      String
+  eventType   String
+  inApp       Boolean @default(true)
+  email       Boolean @default(true)
+  push        Boolean @default(true)
+  sms         Boolean @default(false)
+  quietHours  Json    @default("{}")
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventType])
+}
+
+model TechnicalTask {
+  id              String       @id @default(cuid())
+  code            String       @unique
+  workId          String?
+  discipline      String
+  taskType        String
+  title           String
+  description     String
+  priority        String       @default("NORMAL")
+  status          RecordStatus @default(PENDING)
+  assignedUserId  String
+  reviewerUserId  String?
+  requestedBy     String?
+  requestedAt     DateTime     @default(now())
+  dueAt           DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  progressPct     Decimal      @default(0) @db.Decimal(5,2)
+  estimatedHours  Decimal?     @db.Decimal(10,2)
+  actualHours     Decimal?     @db.Decimal(10,2)
+  entityType      String?
+  entityId        String?
+  notes           String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  work            Work?        @relation(fields: [workId], references: [id])
+  assignedUser    User         @relation("TechnicalAssignee", fields: [assignedUserId], references: [id])
+  reviewerUser    User?        @relation("TechnicalReviewer", fields: [reviewerUserId], references: [id])
+
+  @@index([assignedUserId, status, dueAt])
+  @@index([workId, discipline, status])
+}
+
+model EmployeeWorkAssignment {
+  id          String    @id @default(cuid())
+  employeeId  String
+  workId      String
+  role        String
+  category    String?
+  startDate   DateTime  @default(now())
+  endDate     DateTime?
+  shift       String?
+  costCenter  String?
+  notes       String?
+  employee    Employee  @relation(fields: [employeeId], references: [id])
+  work        Work      @relation(fields: [workId], references: [id])
+
+  @@index([workId, endDate])
+  @@index([employeeId, endDate])
+}
+
+model AttendanceRecord {
+  id             String    @id @default(cuid())
+  employeeId     String
+  workId         String?
+  date           DateTime
+  attendanceType String    @default("PRESENT")
+  checkIn        DateTime?
+  checkOut       DateTime?
+  normalHours    Decimal   @default(0) @db.Decimal(7,2)
+  overtimeHours  Decimal   @default(0) @db.Decimal(7,2)
+  location       String?
+  latitude       Decimal?  @db.Decimal(10,7)
+  longitude      Decimal?  @db.Decimal(10,7)
+  source         String    @default("MANUAL")
+  approvedById   String?
+  observations   String?
+  employee       Employee  @relation(fields: [employeeId], references: [id])
+  work           Work?     @relation(fields: [workId], references: [id])
+
+  @@unique([employeeId, workId, date])
+  @@index([date, attendanceType])
+}
+
+model SafetyCredential {
+  id           String   @id @default(cuid())
+  employeeId   String
+  credentialType String
+  issuer       String?
+  number       String?
+  issuedAt     DateTime?
+  expiresAt    DateTime?
+  status       String   @default("ACTIVE")
+  notes        String?
+  employee     Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([expiresAt, status])
+  @@index([employeeId, credentialType])
+}
+
+model PPEIssue {
+  id          String   @id @default(cuid())
+  employeeId  String
+  item        String
+  brand       String?
+  model       String?
+  serial      String?
+  quantity    Decimal  @default(1) @db.Decimal(10,2)
+  issuedAt    DateTime
+  dueAt       DateTime?
+  returnedAt  DateTime?
+  condition   String?
+  notes       String?
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, dueAt])
+}
+
+model SafetyTraining {
+  id          String   @id @default(cuid())
+  employeeId  String
+  topic       String
+  provider    String?
+  completedAt DateTime
+  expiresAt   DateTime?
+  score       Decimal? @db.Decimal(5,2)
+  approved    Boolean  @default(true)
+  notes       String?
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, expiresAt])
+}
+
+model SafetyIncident {
+  id             String       @id @default(cuid())
+  code           String       @unique
+  workId         String?
+  employeeId     String?
+  incidentType   String
+  severity       String
+  occurredAt     DateTime
+  location       String?
+  description    String
+  immediateAction String?
+  rootCause      String?
+  correctiveAction String?
+  status         RecordStatus @default(PENDING)
+  lostTimeHours  Decimal      @default(0) @db.Decimal(10,2)
+  reportedById   String
+  closedAt       DateTime?
+  work           Work?        @relation(fields: [workId], references: [id])
+  employee       Employee?    @relation(fields: [employeeId], references: [id])
+
+  @@index([status, severity, occurredAt])
+}
+
+model SafetyInspection {
+  id             String       @id @default(cuid())
+  code           String       @unique
+  workId         String?
+  inspectionType String
+  inspectedAt    DateTime
+  inspector      String
+  result         String
+  findings       Json         @default("[]")
+  correctiveActions Json      @default("[]")
+  dueAt          DateTime?
+  status         RecordStatus @default(PENDING)
+  work           Work?        @relation(fields: [workId], references: [id])
+
+  @@index([workId, inspectedAt, status])
+}
+
+model GeneralAsset {
+  id                 String    @id @default(cuid())
+  code               String    @unique
+  assetType          String
+  mobilityClass      String
+  description        String
+  brand              String?
+  model              String?
+  serialNumber       String?
+  purchaseDate       DateTime?
+  acquisitionCost    Decimal   @default(0) @db.Decimal(18,2)
+  currentValue       Decimal   @default(0) @db.Decimal(18,2)
+  status             String    @default("ACTIVE")
+  workId             String?
+  assignedEmployeeId String?
+  location           String?
+  inventoryDate      DateTime?
+  warrantyDue        DateTime?
+  calibrationDue     DateTime?
+  notes              String?
+  work               Work?     @relation(fields: [workId], references: [id])
+  assignedEmployee   Employee? @relation(fields: [assignedEmployeeId], references: [id])
+
+  @@index([assetType, mobilityClass, status])
+  @@index([workId, status])
+  @@index([assignedEmployeeId, status])
+}
+
+model OrganizationStakeholderRole {
+  id             String       @id @default(cuid())
+  organizationId String
+  workId         String?
+  roleType       String
+  active         Boolean      @default(true)
+  accountBalance Decimal      @default(0) @db.Decimal(18,2)
+  creditLimit    Decimal?     @db.Decimal(18,2)
+  paymentTerms   String?
+  contactPerson  String?
+  notes          String?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  work           Work?        @relation(fields: [workId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, workId, roleType])
+  @@index([roleType, active])
+}
+
 }
