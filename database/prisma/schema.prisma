@@ -352,6 +352,10 @@ model Work {
   journalLines       JournalLine[]
   fuelLogs           FuelLog[]
   maintenanceOrders  MaintenanceOrder[]
+  maintenancePlans   MaintenancePlan[]
+  fuelEstimates      FuelEstimate[]
+  insurancePolicies  InsurancePolicy[]
+  unexpectedTasks    UnexpectedTask[]
   payrolls           Payroll[]
   perDiems           PerDiem[]
   lodgings           Lodging[]
@@ -754,6 +758,9 @@ model Machine {
   active            Boolean            @default(true)
   fuelLogs          FuelLog[]
   maintenanceOrders MaintenanceOrder[]
+  maintenancePlans  MaintenancePlan[]
+  insurancePolicies InsurancePolicy[]
+  unexpectedTasks   UnexpectedTask[]
 }
 
 model FuelLog {
@@ -784,16 +791,219 @@ model MaintenanceOrder {
   vehicleId     String?
   machineId     String?
   workId        String?
+  mechanicId    String?
   description   String
   status        RecordStatus @default(PENDING)
+  priority      String       @default("NORMAL")
   scheduledAt   DateTime?
+  startedAt     DateTime?
   completedAt   DateTime?
+  odometerKm    Int?
+  hourMeter     Decimal?     @db.Decimal(12, 2)
   partsCost     Decimal      @default(0) @db.Decimal(18, 2)
   laborCost     Decimal      @default(0) @db.Decimal(18, 2)
   nextServiceAt DateTime?
+  notes         String?
   vehicle       Vehicle?     @relation(fields: [vehicleId], references: [id])
   machine       Machine?     @relation(fields: [machineId], references: [id])
   work          Work?        @relation(fields: [workId], references: [id])
+  mechanic      Mechanic?    @relation(fields: [mechanicId], references: [id])
+  parts         MaintenancePart[]
+}
+
+
+model Mechanic {
+  id                String             @id @default(cuid())
+  employeeId        String?            @unique
+  fullName          String
+  specialty         String?
+  phone             String?
+  email             String?
+  active            Boolean            @default(true)
+  notes             String?
+  employee          Employee?          @relation(fields: [employeeId], references: [id])
+  maintenanceOrders MaintenanceOrder[]
+}
+
+model SparePart {
+  id           String            @id @default(cuid())
+  sku          String            @unique
+  description  String
+  brand        String?
+  unit         String            @default("u")
+  currentStock Decimal           @default(0) @db.Decimal(18, 4)
+  minimumStock Decimal           @default(0) @db.Decimal(18, 4)
+  averageCost  Decimal           @default(0) @db.Decimal(18, 4)
+  location     String?
+  active       Boolean           @default(true)
+  movements    MaintenancePart[]
+}
+
+model MaintenancePart {
+  id                 String           @id @default(cuid())
+  maintenanceOrderId String
+  sparePartId        String
+  quantity           Decimal          @db.Decimal(18, 4)
+  unitCost           Decimal          @db.Decimal(18, 4)
+  total              Decimal          @db.Decimal(18, 2)
+  maintenanceOrder   MaintenanceOrder @relation(fields: [maintenanceOrderId], references: [id], onDelete: Cascade)
+  sparePart          SparePart        @relation(fields: [sparePartId], references: [id])
+
+  @@index([maintenanceOrderId])
+  @@index([sparePartId])
+}
+
+model MaintenancePlan {
+  id               String    @id @default(cuid())
+  vehicleId        String?
+  machineId        String?
+  name             String
+  intervalKm       Int?
+  intervalHours    Decimal?  @db.Decimal(12, 2)
+  intervalDays     Int?
+  lastServiceDate  DateTime?
+  lastOdometerKm   Int?
+  lastHourMeter    Decimal?  @db.Decimal(12, 2)
+  nextServiceDate  DateTime?
+  nextOdometerKm   Int?
+  nextHourMeter    Decimal?  @db.Decimal(12, 2)
+  active           Boolean   @default(true)
+  notes            String?
+  vehicle          Vehicle?  @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  machine          Machine?  @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, active])
+  @@index([machineId, active])
+  @@index([nextServiceDate])
+}
+
+model FuelEstimate {
+  id               String       @id @default(cuid())
+  vehicleId        String
+  workId           String?
+  period           String
+  estimatedLiters  Decimal      @db.Decimal(12, 3)
+  estimatedKm      Int?
+  estimatedHours   Decimal?     @db.Decimal(12, 2)
+  basis            String?
+  status           RecordStatus @default(DRAFT)
+  createdById      String
+  approvedById     String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  vehicle          Vehicle      @relation(fields: [vehicleId], references: [id])
+  work             Work?        @relation(fields: [workId], references: [id])
+
+  @@unique([vehicleId, workId, period])
+  @@index([period, status])
+}
+
+model InsuranceCompany {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  taxId     String?
+  email     String?
+  phone     String?
+  active    Boolean           @default(true)
+  policies  InsurancePolicy[]
+}
+
+model InsurancePolicy {
+  id                 String              @id @default(cuid())
+  policyNumber       String
+  policyType         String
+  insurerId          String
+  workId             String?
+  vehicleId          String?
+  machineId          String?
+  contractor         String?
+  clientOrPrincipal  String?
+  issueDate          DateTime
+  startDate          DateTime
+  endDate            DateTime
+  status             String              @default("ACTIVE")
+  currency           String              @default("ARS")
+  premiumAmount      Decimal             @default(0) @db.Decimal(18, 2)
+  paidAmount         Decimal             @default(0) @db.Decimal(18, 2)
+  coverageAmount     Decimal?            @db.Decimal(18, 2)
+  coverageDetail     String?
+  cancellationDate   DateTime?
+  cancellationReason String?
+  notes              String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  insurer            InsuranceCompany    @relation(fields: [insurerId], references: [id])
+  work               Work?               @relation(fields: [workId], references: [id])
+  vehicle            Vehicle?            @relation(fields: [vehicleId], references: [id])
+  machine            Machine?            @relation(fields: [machineId], references: [id])
+  endorsements       InsuranceEndorsement[]
+  payments           InsurancePayment[]
+
+  @@unique([insurerId, policyNumber])
+  @@index([policyType, status, endDate])
+  @@index([workId])
+}
+
+model InsuranceEndorsement {
+  id            String          @id @default(cuid())
+  policyId      String
+  number        String
+  endorsementType String
+  issueDate     DateTime
+  effectiveDate DateTime
+  endDate       DateTime?
+  description   String?
+  status        String          @default("ACTIVE")
+  policy        InsurancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@unique([policyId, number])
+  @@index([effectiveDate, endDate])
+}
+
+model InsurancePayment {
+  id            String          @id @default(cuid())
+  policyId      String
+  dueDate       DateTime
+  paidAt        DateTime?
+  amount        Decimal         @db.Decimal(18, 2)
+  receiptNumber String?
+  status        String          @default("PENDING")
+  notes         String?
+  policy        InsurancePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
+
+  @@index([status, dueDate])
+}
+
+model UnexpectedTask {
+  id                 String       @id @default(cuid())
+  code               String       @unique
+  title              String
+  description        String
+  priority           String       @default("NORMAL")
+  status             RecordStatus @default(PENDING)
+  source             String?
+  workId             String?
+  assignedUserId     String?
+  assignedEmployeeId String?
+  vehicleId          String?
+  machineId          String?
+  location           String?
+  reportedAt         DateTime     @default(now())
+  dueAt              DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  estimatedCost      Decimal      @default(0) @db.Decimal(18, 2)
+  actualCost         Decimal      @default(0) @db.Decimal(18, 2)
+  createdById        String
+  notes              String?
+  work               Work?        @relation(fields: [workId], references: [id])
+  assignedEmployee   Employee?    @relation(fields: [assignedEmployeeId], references: [id])
+  vehicle            Vehicle?     @relation(fields: [vehicleId], references: [id])
+  machine            Machine?     @relation(fields: [machineId], references: [id])
+
+  @@index([status, priority, dueAt])
+  @@index([workId])
+  @@index([assignedEmployeeId])
 }
 
 model Employee {
@@ -810,6 +1020,8 @@ model Employee {
   metadata       Json      @default("{}")
   payrolls       Payroll[]
   perDiems       PerDiem[]
+  mechanic       Mechanic?
+  unexpectedTasks UnexpectedTask[]
 }
 
 model Payroll {
