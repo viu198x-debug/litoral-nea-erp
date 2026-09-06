@@ -5,6 +5,31 @@ import bcrypt from "bcryptjs";
 const prisma = new PrismaClient();
 
 
+async function ensureOperationalModules() {
+  const definitions = [
+    ["mechanics", "Mecánicos", "Operaciones", "Wrench", "Mecánicos internos/externos, especialidades y OT asignadas."],
+    ["spare-parts", "Repuestos", "Operaciones", "Boxes", "Repuestos, stock, mínimos, costos y consumos."],
+    ["fuel-estimates", "Estimación combustible", "Operaciones", "Fuel", "Estimación de litros por vehículo, obra y período contra consumo real."],
+    ["insurance", "Pólizas y cauciones", "Operaciones", "ShieldCheck", "Seguros y cauciones con vigencias, endosos, renovaciones y pagos."],
+    ["unexpected-tasks", "Trabajos imprevistos", "Operaciones", "ListChecks", "Tareas imprevistas asignadas con prioridad, recursos, costo y cierre."],
+  ] as const;
+  const actions = ["view", "create", "modify", "approve", "void", "download", "export", "admin"];
+  for (const [slug, label, groupName, icon, summary] of definitions) {
+    await prisma.moduleConfiguration.upsert({
+      where: { slug },
+      update: { label, groupName, icon, summary, active: true },
+      create: { slug, label, groupName, icon, summary, active: true, requiresWork: false, isSystem: true },
+    });
+    for (const action of actions) {
+      await prisma.permission.upsert({
+        where: { module_action: { module: slug, action } },
+        update: {},
+        create: { module: slug, action },
+      });
+    }
+  }
+}
+
 async function ensureCoreRoles() {
   const adminRole = await prisma.role.upsert({
     where: { code: "ADMIN_GENERAL" },
@@ -66,6 +91,7 @@ async function ensureCoreRoles() {
 }
 
 async function main() {
+  await ensureOperationalModules();
   await ensureCoreRoles();
   const email = (process.env.BOOTSTRAP_ADMIN_EMAIL ?? "admin@litoralnea.com").trim().toLowerCase();
   const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
