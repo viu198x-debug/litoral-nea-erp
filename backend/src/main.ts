@@ -51,6 +51,13 @@ async function bootstrap() {
   app.use(json({ limit: config.get<string>("JSON_BODY_LIMIT", "1mb") }));
   app.use(urlencoded({ extended: false, limit: "32kb", parameterLimit: 100 }));
   app.use((request: Request, response: Response, next: NextFunction) => {
+    response.setHeader("Cache-Control", "no-store, max-age=0");
+    response.setHeader("Pragma", "no-cache");
+    response.setHeader("Expires", "0");
+    response.setHeader("X-Robots-Tag", "noindex, nofollow, nosnippet");
+    next();
+  });
+  app.use((request: Request, response: Response, next: NextFunction) => {
     const incoming = request.get("x-request-id");
     const requestId = incoming && /^[a-zA-Z0-9._-]{8,80}$/.test(incoming)
       ? incoming
