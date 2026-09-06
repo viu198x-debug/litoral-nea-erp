@@ -521,7 +521,7 @@ export function ErpApp() {
             <kbd>⌘ K</kbd>
           </label>
           <div className="topbar-actions">
-            <button className="icon-button notification-button" aria-label="Alertas">
+            <button className="icon-button notification-button" aria-label="Notificaciones" onClick={() => navigate("notifications")}>
               <Bell size={20} />
               <span />
             </button>
@@ -542,6 +542,7 @@ export function ErpApp() {
               work={selectedWork}
               onBack={() => navigate("works")}
               onCreate={() => setCreateOpen(true)}
+              onNavigate={navigate}
             />
           ) : activeSlug === "dashboard" ? (
             <GeneralDashboard
@@ -1184,6 +1185,7 @@ function GeneralDashboard({
               Ver las 8 obras <ArrowRight size={16} />
             </button>
           </div>
+          <div className="table-scroll" role="region" aria-label="Estado de obras" tabIndex={0}>
           <Table className="erp-table">
             <TableHeader>
               <TableRow>
@@ -1222,6 +1224,7 @@ function GeneralDashboard({
               ))}
             </TableBody>
           </Table>
+          </div>
         </article>
 
         <article className="panel alert-panel">
@@ -1230,7 +1233,7 @@ function GeneralDashboard({
               <span className="panel-kicker orange">Prioridad</span>
               <h2>Alertas</h2>
             </div>
-            <button className="icon-button"><SlidersHorizontal size={17} /></button>
+            <button className="icon-button" aria-label="Abrir centro de alertas" onClick={() => onNavigate("management")}><SlidersHorizontal size={17} /></button>
           </div>
           <div className="alert-list">
             {alerts.map((alert) => (
@@ -1362,6 +1365,7 @@ function WorksPage({
   workItems: Work[];
 }) {
   const [status, setStatus] = useState("Todas");
+  const [showFilters, setShowFilters] = useState(false);
   const filtered = workItems.filter(
     (work) =>
       (status === "Todas" || work.status === status) &&
@@ -1395,8 +1399,18 @@ function WorksPage({
             </button>
           ))}
         </div>
-        <button className="button secondary"><Filter size={17} /> Más filtros</button>
+        <button className="button secondary" onClick={() => setShowFilters((value) => !value)} aria-expanded={showFilters}>
+          <Filter size={17} /> {showFilters ? "Ocultar filtros" : "Más filtros"}
+        </button>
       </div>
+      {showFilters && (
+        <div className="advanced-filters panel">
+          <label><span>Estado</span><select value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option>Todas</option><option>Normal</option><option>Atención</option>
+          </select></label>
+          <span>La búsqueda superior filtra también por obra, código, cliente y ciudad.</span>
+        </div>
+      )}
       <section className="work-card-grid">
         {filtered.map((work) => (
           <button className="work-card" key={work.id} onClick={() => onOpenWork(work)}>
@@ -1435,10 +1449,12 @@ function WorkDashboard({
   work,
   onBack,
   onCreate,
+  onNavigate,
 }: {
   work: Work;
   onBack: () => void;
   onCreate: () => void;
+  onNavigate: (slug: string) => void;
 }) {
   const [tab, setTab] = useState("Resumen");
   const billed = work.contractAmount * (work.financialProgress / 100);
@@ -1455,7 +1471,7 @@ function WorkDashboard({
             <p>{work.client} · {work.city}, Corrientes</p>
           </div>
           <div className="hero-actions">
-            <button className="button glass"><Upload size={17} /> Adjuntar</button>
+            <button className="button glass" onClick={() => onNavigate("documents")}><Upload size={17} /> Adjuntar</button>
             <button className="button orange" onClick={onCreate}><Plus size={17} /> Nuevo parte</button>
           </div>
         </div>
@@ -1467,13 +1483,24 @@ function WorkDashboard({
       </section>
 
       <div className="work-tabs" role="tablist">
-        {["Resumen", "Avance", "Presupuesto", "Certificados", "Compras", "Personal", "Documentos"].map((item) => (
+        {[
+          ["Resumen", "summary"],
+          ["Avance", "progress"],
+          ["Presupuesto", "budgets"],
+          ["Certificados", "certificates"],
+          ["Compras", "purchases"],
+          ["Personal", "personnel-control"],
+          ["Documentos", "documents"],
+        ].map(([item, slug]) => (
           <button
             role="tab"
             aria-selected={tab === item}
             className={tab === item ? "active" : ""}
             key={item}
-            onClick={() => setTab(item)}
+            onClick={() => {
+              if (slug === "summary") setTab("Resumen");
+              else onNavigate(slug);
+            }}
           >
             {item}
           </button>
@@ -1548,7 +1575,7 @@ function WorkDashboard({
               </div>
             </article>
             <article className="panel">
-              <div className="panel-heading"><div><span className="panel-kicker">Documentación</span><h2>Últimos archivos</h2></div><button className="link-button">Ver todos</button></div>
+              <div className="panel-heading"><div><span className="panel-kicker">Documentación</span><h2>Últimos archivos</h2></div><button className="link-button" onClick={() => onNavigate("documents")}>Ver todos</button></div>
               <div className="document-list">
                 {[
                   ["PDF", "Acta de inspección Nº 08", "v2 · hoy, 10:42"],
@@ -2009,6 +2036,8 @@ function ModulePage({
   const [deletingId, setDeletingId] = useState("");
   const [loadingRows, setLoadingRows] = useState(!demoMode);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showModuleFilters, setShowModuleFilters] = useState(false);
+  const [compactColumns, setCompactColumns] = useState(false);
   const effectiveSearch = localSearch || search;
   const demoRows = useMemo(
     () =>
@@ -2145,11 +2174,19 @@ function ModulePage({
         <div className="module-toolbar">
           <div className="inline-search"><Search size={17} /><input value={localSearch} onChange={(event) => setLocalSearch(event.target.value)} placeholder="Buscar registros…" aria-label="Buscar registros" /></div>
           <div>
-            <button className="button secondary"><Filter size={17} /> Filtros</button>
-            <button className="button secondary"><SlidersHorizontal size={17} /> Columnas</button>
+            <button className="button secondary" onClick={() => setShowModuleFilters((value) => !value)} aria-expanded={showModuleFilters}><Filter size={17} /> Filtros</button>
+            <button className="button secondary" onClick={() => setCompactColumns((value) => !value)} aria-pressed={compactColumns}><SlidersHorizontal size={17} /> {compactColumns ? "Todas las columnas" : "Columnas esenciales"}</button>
           </div>
         </div>
-        <Table className="erp-table module-table">
+        {showModuleFilters && (
+          <div className="module-filter-strip">
+            <span>Filtro activo</span>
+            <strong>{effectiveSearch.trim() ? effectiveSearch : "Sin texto de búsqueda"}</strong>
+            <button type="button" onClick={() => setLocalSearch("")}>Limpiar</button>
+          </div>
+        )}
+        <div className="table-scroll" role="region" aria-label={`Registros de ${module.label}`} tabIndex={0}>
+        <Table className={`erp-table module-table ${compactColumns ? "compact-columns" : ""}`}>
           <TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Descripción</TableHead><TableHead>Datos característicos</TableHead><TableHead>Obra</TableHead><TableHead>Fecha</TableHead><TableHead>Responsable</TableHead><TableHead>Importe</TableHead><TableHead>Estado</TableHead><TableHead /></TableRow></TableHeader>
           <TableBody>
             {loadingRows && (
@@ -2187,15 +2224,24 @@ function ModulePage({
             ))}
           </TableBody>
         </Table>
+        </div>
         <div className="table-footer"><span>Mostrando {rows.length}{demoMode ? " de 24" : ""} registros</span><div><button disabled><ArrowLeft size={16} /></button><button className="active">1</button>{demoMode && <><button>2</button><button>3</button><button><ArrowRight size={16} /></button></>}</div></div>
       </section>
       <section className="feature-grid">
         {module.features.map((feature, index) => (
-          <div className="feature-card" key={feature}>
+          <button
+            className="feature-card"
+            key={feature}
+            type="button"
+            onClick={() => {
+              setLocalSearch(feature);
+              document.querySelector(".module-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+            }}
+          >
             <span>{String(index + 1).padStart(2, "0")}</span>
             <strong>{feature}</strong>
             <ArrowUpRight size={17} />
-          </div>
+          </button>
         ))}
       </section>
       <RecordEditDialog
