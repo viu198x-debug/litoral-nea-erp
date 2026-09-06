@@ -1,0 +1,42 @@
+name: ERP CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: erp-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.1"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate Prisma schema
+        run: npx prisma validate --schema database/prisma/schema.prisma
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Build backend
+        run: npm --workspace backend run build
+
+      - name: Build frontend
+        env:
+          NEXT_PUBLIC_API_URL: https://litoral-nea-erp-api-viu198x.onrender.com/api/v1
+          NEXT_PUBLIC_DEMO_MODE: "false"
+        run: npm --workspace frontend run build
