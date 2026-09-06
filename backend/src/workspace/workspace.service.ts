@@ -164,8 +164,10 @@ export class WorkspaceService {
     const current = await this.prisma.technicalTask.findFirst({
       where: {
         id,
-        OR: [{ assignedUserId: user.id }, { reviewerUserId: user.id }],
-        OR: [{ workId: null }, { work: { companyId: user.companyId } }],
+        AND: [
+          { OR: [{ assignedUserId: user.id }, { reviewerUserId: user.id }] },
+          { OR: [{ workId: null }, { work: { companyId: user.companyId } }] },
+        ],
       },
     });
     if (!current && !user.roleCodes.some((role) => ["ADMIN_GENERAL", "GERENTE_EMPRESA"].includes(role))) {
