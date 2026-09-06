@@ -25,7 +25,10 @@ export class CreateManualUserDto {
   roleCode!: string;
 
   @IsString()
-  @Length(10, 72)
+  @Length(12, 72)
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).+$/, {
+    message: "La contraseña debe incluir mayúscula, minúscula, número y símbolo",
+  })
   password!: string;
 
   @IsOptional()
