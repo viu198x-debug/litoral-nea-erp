@@ -753,7 +753,19 @@ function LoginScreen({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),
       });
-      if (!response.ok) throw new Error("Usuario o contraseña incorrectos.");
+      if (!response.ok) {
+        const problem = (await response.json().catch(() => null)) as
+          | { message?: string | string[]; code?: string }
+          | null;
+        const detail = Array.isArray(problem?.message)
+          ? problem?.message.join(". ")
+          : problem?.message;
+        throw new Error(
+          detail
+            ? `${response.status} · ${detail}`
+            : `${response.status} · No se pudo autenticar contra la API.`,
+        );
+      }
       const payload = (await response.json()) as {
         user: { firstName: string; lastName: string; email: string; roleCodes: string[] };
         csrfToken?: string;
