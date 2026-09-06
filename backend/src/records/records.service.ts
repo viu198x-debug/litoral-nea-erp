@@ -4,12 +4,14 @@ import { PrismaService } from "../prisma/prisma.service";
 import type { CreateRecordDto } from "./dto/create-record.dto";
 import type { UpdateRecordDto } from "./dto/update-record.dto";
 import { OperationalRecordsService } from "./operational-records.service";
+import { BusinessRecordsService } from "./business-records.service";
 
 @Injectable()
 export class RecordsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly operational: OperationalRecordsService,
+    private readonly business: BusinessRecordsService,
   ) {}
 
   list(
@@ -19,6 +21,9 @@ export class RecordsService {
   ) {
     if (this.operational.handles(module)) {
       return this.operational.list(companyId, module, filters);
+    }
+    if (this.business.handles(module)) {
+      return this.business.list(companyId, module, filters);
     }
     if (["assets", "stakeholders", "personnel-control", "safety"].includes(module)) {
       return this.listDomain(companyId, module, filters);
@@ -77,6 +82,9 @@ export class RecordsService {
     if (this.operational.handles(module)) {
       return this.operational.create(companyId, module, userId, dto);
     }
+    if (this.business.handles(module)) {
+      return this.business.create(companyId, module, userId, dto);
+    }
     if (["assets", "stakeholders", "personnel-control", "safety"].includes(module)) {
       return this.createDomain(companyId, module, userId, dto);
     }
@@ -103,6 +111,9 @@ export class RecordsService {
     if (this.operational.handles(module)) {
       return this.operational.update(companyId, module, id, dto);
     }
+    if (this.business.handles(module)) {
+      return this.business.update(companyId, module, id, dto);
+    }
     if (["assets", "stakeholders", "personnel-control", "safety"].includes(module)) {
       return this.updateDomain(companyId, module, id, dto);
     }
@@ -125,6 +136,9 @@ export class RecordsService {
   async softDelete(companyId: string, module: string, id: string, userId: string) {
     if (this.operational.handles(module)) {
       return this.operational.softDelete(companyId, module, id, userId);
+    }
+    if (this.business.handles(module)) {
+      return this.business.softDelete(companyId, module, id, userId);
     }
     if (["assets", "stakeholders", "personnel-control", "safety"].includes(module)) {
       return this.softDeleteDomain(companyId, module, id);
