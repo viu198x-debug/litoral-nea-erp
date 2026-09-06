@@ -1748,6 +1748,226 @@ function SectorDashboardPanel({ module }: { module: ModuleDefinition }) {
   );
 }
 
+type TechnicalWorkspacePayload = {
+  generatedAt: string;
+  summary: {
+    assignedTasks: number;
+    inProgress: number;
+    overdue: number;
+    unexpectedOpen: number;
+    activeWorks: number;
+    unreadNotifications: number;
+  };
+  tasks: Array<{
+    id: string;
+    code: string;
+    title: string;
+    discipline: string;
+    taskType: string;
+    priority: string;
+    status: string;
+    dueAt?: string | null;
+    progressPct: string | number;
+    work?: { code: string; name: string } | null;
+  }>;
+  unexpectedTasks: Array<{
+    id: string;
+    code: string;
+    title: string;
+    priority: string;
+    status: string;
+    dueAt?: string | null;
+    work?: { code: string; name: string } | null;
+  }>;
+  works: Array<{
+    id: string;
+    code: string;
+    name: string;
+    status: string;
+    city?: string | null;
+    physicalProgress: string | number;
+    contractualEndDate?: string | null;
+  }>;
+  notifications: Array<{
+    id: string;
+    title: string;
+    message: string;
+    severity: string;
+    createdAt: string;
+  }>;
+};
+
+function TechnicalWorkspaceLivePanel() {
+  const [payload, setPayload] = useState<TechnicalWorkspacePayload | null>(null);
+  const [loading, setLoading] = useState(!demoMode);
+
+  const load = () => {
+    if (demoMode) return;
+    setLoading(true);
+    void apiFetch("/workspace/technical")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("No se pudo cargar la bandeja técnica");
+        return response.json() as Promise<TechnicalWorkspacePayload>;
+      })
+      .then(setPayload)
+      .catch((cause) => toast.error("Bandeja técnica no disponible", {
+        description: cause instanceof Error ? cause.message : "Error de conexión",
+      }))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const setTaskStatus = async (id: string, status: "ACTIVE" | "CLOSED") => {
+    const response = await apiFetch(`/workspace/technical/tasks/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status, progressPct: status === "CLOSED" ? 100 : undefined }),
+    });
+    if (!response.ok) {
+      const problem = (await response.json().catch(() => null)) as { message?: string } | null;
+      toast.error("No se pudo actualizar la tarea", { description: problem?.message });
+      return;
+    }
+    toast.success(status === "CLOSED" ? "Tarea finalizada" : "Tarea iniciada");
+    load();
+  };
+
+  if (demoMode) return null;
+
+  return (
+    <section className="technical-workspace-live">
+      <div className="technical-summary-strip">
+        <article><small>Asignadas</small><strong>{payload?.summary.assignedTasks ?? "—"}</strong></article>
+        <article><small>En ejecución</small><strong>{payload?.summary.inProgress ?? "—"}</strong></article>
+        <article><small>Vencidas</small><strong>{payload?.summary.overdue ?? "—"}</strong></article>
+        <article><small>Imprevistos</small><strong>{payload?.summary.unexpectedOpen ?? "—"}</strong></article>
+        <article><small>Obras asignadas</small><strong>{payload?.summary.activeWorks ?? "—"}</strong></article>
+        <article><small>Avisos sin leer</small><strong>{payload?.summary.unreadNotifications ?? "—"}</strong></article>
+      </div>
+      <div className="technical-workspace-grid">
+        <article className="panel">
+          <div className="panel-heading">
+            <div><span className="panel-kicker">Mi agenda</span><h2>Tareas técnicas asignadas</h2></div>
+            <small>{loading ? "Actualizando…" : `${payload?.tasks.length ?? 0} tareas`}</small>
+          </div>
+          <div className="technical-task-list">
+            {payload?.tasks.length ? payload.tasks.map((task) => (
+              <div key={task.id}>
+                <span className={`technical-priority ${task.priority.toLowerCase()}`} />
+                <span className="technical-task-copy">
+                  <strong>{task.code} · {task.title}</strong>
+                  <small>
+                    {[task.work?.code, task.discipline, task.taskType, task.dueAt ? `vence ${new Intl.DateTimeFormat("es-AR").format(new Date(task.dueAt))}` : null]
+                      .filter(Boolean).join(" · ")}
+                  </small>
+                </span>
+                <span className="technical-task-progress">{Number(task.progressPct)}%</span>
+                <span className="technical-task-actions">
+                  {task.status !== "ACTIVE" && task.status !== "CLOSED" && (
+                    <button className="button secondary" onClick={() => void setTaskStatus(task.id, "ACTIVE")}>Iniciar</button>
+                  )}
+                  {task.status !== "CLOSED" && (
+                    <button className="button primary" onClick={() => void setTaskStatus(task.id, "CLOSED")}>Finalizar</button>
+                  )}
+                </span>
+              </div>
+            )) : <p className="sector-dashboard-empty">No hay tareas técnicas asignadas.</p>}
+          </div>
+        </article>
+
+        <article className="panel">
+          <div className="panel-heading">
+            <div><span className="panel-kicker orange">Campo</span><h2>Imprevistos abiertos</h2></div>
+          </div>
+          <div className="technical-task-list compact">
+            {payload?.unexpectedTasks.length ? payload.unexpectedTasks.map((task) => (
+              <div key={task.id}>
+                <span className={`technical-priority ${task.priority.toLowerCase()}`} />
+                <span className="technical-task-copy">
+                  <strong>{task.code} · {task.title}</strong>
+                  <small>{[task.work?.code, task.status, task.dueAt ? new Intl.DateTimeFormat("es-AR").format(new Date(task.dueAt)) : null].filter(Boolean).join(" · ")}</small>
+                </span>
+              </div>
+            )) : <p className="sector-dashboard-empty">Sin trabajos imprevistos asignados.</p>}
+          </div>
+        </article>
+      </div>
+    </section>
+  );
+}
+
+type NotificationRow = {
+  id: string;
+  title: string;
+  message: string;
+  severity: string;
+  module?: string | null;
+  readAt?: string | null;
+  createdAt: string;
+  deliveries?: Array<{ channel: string; status: string }>;
+};
+
+function NotificationCenterLivePanel() {
+  const [items, setItems] = useState<NotificationRow[]>([]);
+  const [loading, setLoading] = useState(!demoMode);
+
+  const load = () => {
+    if (demoMode) return;
+    setLoading(true);
+    void apiFetch("/workspace/notifications")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("No se pudieron cargar las notificaciones");
+        return response.json() as Promise<NotificationRow[]>;
+      })
+      .then(setItems)
+      .catch((cause) => toast.error("Notificaciones no disponibles", {
+        description: cause instanceof Error ? cause.message : "Error de conexión",
+      }))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const markRead = async (id: string) => {
+    const response = await apiFetch(`/workspace/notifications/${id}/read`, { method: "PATCH" });
+    if (response.ok) load();
+  };
+
+  if (demoMode) return null;
+
+  return (
+    <section className="panel notification-center-live">
+      <div className="panel-heading">
+        <div><span className="panel-kicker">Centro de avisos</span><h2>Notificaciones del usuario</h2></div>
+        <small>{loading ? "Actualizando…" : `${items.filter((item) => !item.readAt).length} sin leer`}</small>
+      </div>
+      <div className="notification-live-list">
+        {items.length ? items.map((item) => (
+          <div className={item.readAt ? "read" : ""} key={item.id}>
+            <i className={item.severity.toLowerCase()} />
+            <span>
+              <strong>{item.title}</strong>
+              <small>{item.message}</small>
+              <em>
+                {new Intl.DateTimeFormat("es-AR", { dateStyle: "short", timeStyle: "short" }).format(new Date(item.createdAt))}
+                {item.deliveries?.length
+                  ? ` · ${item.deliveries.map((delivery) => `${delivery.channel}: ${delivery.status}`).join(" · ")}`
+                  : ""}
+              </em>
+            </span>
+            {!item.readAt && <button className="button secondary" onClick={() => void markRead(item.id)}>Marcar leída</button>}
+          </div>
+        )) : <p className="sector-dashboard-empty">No hay notificaciones.</p>}
+      </div>
+    </section>
+  );
+}
+
 function ModulePage({
   module,
   onCreate,
@@ -1877,6 +2097,8 @@ function ModulePage({
         </span>
       </section>
       <SectorDashboardPanel module={module} />
+      {module.slug === "technical-workspace" && <TechnicalWorkspaceLivePanel />}
+      {module.slug === "notifications" && <NotificationCenterLivePanel />}
       <section className="panel module-panel">
         <div className="module-toolbar">
           <div className="inline-search"><Search size={17} /><input value={localSearch} onChange={(event) => setLocalSearch(event.target.value)} placeholder="Buscar registros…" aria-label="Buscar registros" /></div>
