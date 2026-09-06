@@ -391,7 +391,7 @@ function demoFieldValue(
       firstName: "Administrador",
       lastName: "General",
       roleId: roles.admin.id,
-      password: "Litoral#Admin26",
+      password: process.env.SEED_ADMIN_PASSWORD ?? "CAMBIAR_ADMIN_EN_ENTORNO",
     },
     {
       username: "administracion1",
@@ -399,7 +399,7 @@ function demoFieldValue(
       firstName: "Ana",
       lastName: "Gómez",
       roleId: roles.purchasing.id,
-      password: "Compras#LNEA26",
+      password: process.env.SEED_USER_PASSWORD ?? "CAMBIAR_USUARIOS_EN_ENTORNO",
     },
     {
       username: "administracion2",
@@ -407,7 +407,7 @@ function demoFieldValue(
       firstName: "María",
       lastName: "López",
       roleId: roles.accounting.id,
-      password: "Contable#LNEA26",
+      password: process.env.SEED_USER_PASSWORD ?? "CAMBIAR_USUARIOS_EN_ENTORNO",
     },
     {
       username: "administracion3",
@@ -415,7 +415,7 @@ function demoFieldValue(
       firstName: "Pablo",
       lastName: "Ramírez",
       roleId: roles.people.id,
-      password: "Personal#LNEA26",
+      password: process.env.SEED_USER_PASSWORD ?? "CAMBIAR_USUARIOS_EN_ENTORNO",
     },
     {
       username: "tecnico1",
@@ -423,7 +423,7 @@ function demoFieldValue(
       firstName: "Víctor",
       lastName: "Encina",
       roleId: roles.siteLead.id,
-      password: "Obra#LNEA26",
+      password: process.env.SEED_USER_PASSWORD ?? "CAMBIAR_USUARIOS_EN_ENTORNO",
     },
     {
       username: "tecnico2",
@@ -431,7 +431,7 @@ function demoFieldValue(
       firstName: "Carlos",
       lastName: "Ruiz",
       roleId: roles.technicalOffice.id,
-      password: "Ingenieria#LNEA26",
+      password: process.env.SEED_USER_PASSWORD ?? "CAMBIAR_USUARIOS_EN_ENTORNO",
     },
     {
       username: "tecnico3",
@@ -439,7 +439,7 @@ function demoFieldValue(
       firstName: "Diego",
       lastName: "Silva",
       roleId: roles.equipment.id,
-      password: "Equipos#LNEA26",
+      password: process.env.SEED_USER_PASSWORD ?? "CAMBIAR_USUARIOS_EN_ENTORNO",
     },
   ];
 
@@ -946,7 +946,7 @@ function demoFieldValue(
 
   console.log("Seed demo LITORAL NEA ERP completado");
   console.log("Usuario: admin@litoralnea.com");
-  console.log("Contraseña: Litoral#Admin26");
+  console.log("Contraseña inicial: configurada mediante SEED_ADMIN_PASSWORD");
 }
 
 main()
