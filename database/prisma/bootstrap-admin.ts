@@ -12,6 +12,12 @@ async function ensureOperationalModules() {
     ["fuel-estimates", "Estimación combustible", "Operaciones", "Fuel", "Estimación de litros por vehículo, obra y período contra consumo real."],
     ["insurance", "Pólizas y cauciones", "Operaciones", "ShieldCheck", "Seguros y cauciones con vigencias, endosos, renovaciones y pagos."],
     ["unexpected-tasks", "Trabajos imprevistos", "Operaciones", "ListChecks", "Tareas imprevistas asignadas con prioridad, recursos, costo y cierre."],
+    ["technical-workspace", "Mi trabajo técnico", "Principal", "ClipboardCheck", "Bandeja personal del técnico con tareas, vencimientos, obras y entregables."],
+    ["notifications", "Notificaciones", "Principal", "Bell", "Centro de avisos in-app, email y push preparado."],
+    ["personnel-control", "Control de personal", "Personas", "ClipboardCheck", "Asignación, asistencia, horas y novedades por obra."],
+    ["safety", "Seguridad e Higiene", "Personas", "ShieldCheck", "EPP, capacitaciones, incidentes, inspecciones y vencimientos."],
+    ["assets", "Inventario de activos", "Operaciones", "Boxes", "Bienes móviles y no móviles, herramientas, informática e instalaciones."],
+    ["stakeholders", "Terceros y dependencias", "Abastecimiento", "Building2", "Comitentes, contratistas, proveedores, acreedores y aseguradoras."],
   ] as const;
   const actions = ["view", "create", "modify", "approve", "void", "download", "export", "admin"];
   for (const [slug, label, groupName, icon, summary] of definitions) {
