@@ -2306,6 +2306,7 @@ function ModulePage({
           <ModuleConfiguratorPanel />
           <WorkflowConfiguratorPanel />
           <ManualUserAdminPanel />
+          <StarterImportPanel />
           <UserRolesPanel />
           <RegistrationRequestsPanel />
           <section className="security-note">
@@ -2728,6 +2729,171 @@ function WorkflowConfiguratorPanel() {
         <button className="button secondary" type="button" onClick={() => change({ steps: [...selected.steps, { role: "ADMIN_GENERAL", label: "Aprobación final" }] })}><Plus size={16} /> Agregar paso</button>
       </div>
       <div className="workflow-footer"><small>{selected.module} · {selected.code} · todas las modificaciones quedan auditadas</small><button className="button primary" disabled={saving} type="button" onClick={() => void save()}><Check size={16} /> {saving ? "Guardando…" : "Guardar flujo"}</button></div>
+    </section>
+  );
+}
+
+type StarterImportKind = "works" | "employees" | "suppliers" | "vehicles" | "assets";
+
+const starterTemplates: Record<StarterImportKind, { label: string; headers: string[]; example: string[] }> = {
+  works: {
+    label: "Obras",
+    headers: ["codigo","nombre","comitente","ciudad","centroCosto","montoContrato","presupuestoObjetivo","fechaInicio","fechaFin","responsable"],
+    example: ["OB-EJ-001","EJEMPLO · Obra vial","Municipalidad Ejemplo","Corrientes","CC-EJ-001","125000000","108000000","2026-09-01","2027-03-31","Responsable Técnico"],
+  },
+  employees: {
+    label: "Personal",
+    headers: ["legajo","nombreCompleto","cuil","categoria","puesto","fechaIngreso","basico"],
+    example: ["EJ-001","Empleado Ejemplo","20-00000000-0","Oficial","Operario","2026-09-01","850000"],
+  },
+  suppliers: {
+    label: "Proveedores",
+    headers: ["razonSocial","cuit","condicionIva","email","telefono","domicilio","cbu","saldo"],
+    example: ["Proveedor Ejemplo SRL","30-00000000-0","Responsable Inscripto","ejemplo@proveedor.test","3794000000","Corrientes","0000000000000000000000","0"],
+  },
+  vehicles: {
+    label: "Vehículos",
+    headers: ["patente","marca","modelo","anio","kilometraje","vencimientoSeguro","vencimientoRto","codigoObra"],
+    example: ["EJ000LN","Iveco","Tector","2022","65000","2026-12-31","2026-11-30","OB-EJ-001"],
+  },
+  assets: {
+    label: "Activos",
+    headers: ["codigo","tipo","movilidad","descripcion","marca","modelo","serie","costo","valorActual","codigoObra","ubicacion"],
+    example: ["ACT-EJ-001","Herramienta","Móvil","Taladro percutor de ejemplo","Bosch","GBH","SERIE-EJ","450000","380000","OB-EJ-001","Depósito"],
+  },
+};
+
+function parseCsvText(text: string) {
+  const normalized = text.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n");
+  const lines = normalized.split("\n").filter((line) => line.trim().length > 0);
+  if (!lines.length) return [] as Record<string, string>[];
+  const delimiter = (lines[0].match(/;/g)?.length ?? 0) >= (lines[0].match(/,/g)?.length ?? 0) ? ";" : ",";
+  const parseLine = (line: string) => {
+    const result: string[] = [];
+    let current = "";
+    let quoted = false;
+    for (let index = 0; index < line.length; index += 1) {
+      const char = line[index];
+      if (char === '"') {
+        if (quoted && line[index + 1] === '"') {
+          current += '"';
+          index += 1;
+        } else {
+          quoted = !quoted;
+        }
+      } else if (char === delimiter && !quoted) {
+        result.push(current.trim());
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+    result.push(current.trim());
+    return result;
+  };
+  const headers = parseLine(lines[0]).map((value) => value.trim());
+  return lines.slice(1).map((line) => {
+    const values = parseLine(line);
+    return Object.fromEntries(headers.map((header, index) => [header, values[index] ?? ""]));
+  });
+}
+
+function StarterImportPanel() {
+  const [kind, setKind] = useState<StarterImportKind>("works");
+  const [fileName, setFileName] = useState("");
+  const [rows, setRows] = useState<Record<string, string>[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [summary, setSummary] = useState<{ total: number; created: number; updated: number; skipped: number } | null>(null);
+
+  const downloadTemplate = () => {
+    const template = starterTemplates[kind];
+    const csv = [template.headers.join(";"), template.example.join(";")].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `litoral-nea-plantilla-${kind}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  };
+
+  const loadFile = async (file?: File) => {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error("Archivo demasiado grande", { description: "La importación inicial admite hasta 2 MB por archivo." });
+      return;
+    }
+    const parsed = parseCsvText(await file.text()).slice(0, 500);
+    setFileName(file.name);
+    setRows(parsed);
+    setSummary(null);
+    toast.success("Archivo preparado", { description: `${parsed.length} filas detectadas` });
+  };
+
+  const importRows = async () => {
+    if (!rows.length) {
+      toast.error("Seleccioná un CSV con datos antes de importar.");
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await apiFetch("/system/starter-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ kind, rows }),
+      });
+      const payload = (await response.json().catch(() => null)) as {
+        total?: number; created?: number; updated?: number; skipped?: number; message?: string | string[];
+      } | null;
+      if (!response.ok) {
+        throw new Error(Array.isArray(payload?.message) ? payload?.message.join(". ") : payload?.message ?? "La API rechazó la importación.");
+      }
+      const next = {
+        total: payload?.total ?? rows.length,
+        created: payload?.created ?? 0,
+        updated: payload?.updated ?? 0,
+        skipped: payload?.skipped ?? 0,
+      };
+      setSummary(next);
+      toast.success("Importación finalizada", {
+        description: `${next.created} altas · ${next.updated} actualizaciones · ${next.skipped} omitidas`,
+      });
+      window.dispatchEvent(new Event("lnea:records-changed"));
+    } catch (cause) {
+      toast.error("No se pudo importar", { description: cause instanceof Error ? cause.message : "Error de importación" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="panel starter-import-panel">
+      <div className="panel-heading">
+        <div><span className="panel-kicker">Carga inicial</span><h2>Importar datos desde CSV</h2></div>
+        <span className="registration-count">Administrador</span>
+      </div>
+      <div className="starter-import-body">
+        <div className="starter-import-controls">
+          <label className="form-field">
+            <span>Tipo de datos</span>
+            <select value={kind} onChange={(event) => { setKind(event.target.value as StarterImportKind); setRows([]); setFileName(""); setSummary(null); }}>
+              {Object.entries(starterTemplates).map(([value, template]) => <option key={value} value={value}>{template.label}</option>)}
+            </select>
+          </label>
+          <button className="button secondary" type="button" onClick={downloadTemplate}><Download size={16} /> Descargar plantilla</button>
+          <label className="button secondary starter-file-button">
+            <Upload size={16} /> {fileName || "Seleccionar CSV"}
+            <input type="file" accept=".csv,text/csv" onChange={(event) => void loadFile(event.target.files?.[0])} />
+          </label>
+          <button className="button primary" type="button" disabled={loading || rows.length === 0} onClick={() => void importRows()}>
+            <Upload size={16} /> {loading ? "Importando…" : `Importar ${rows.length || ""}`}
+          </button>
+        </div>
+        <div className="starter-import-help">
+          <strong>{starterTemplates[kind].label}</strong>
+          <p>Descargá la plantilla, reemplazá la fila <b>EJEMPLO</b> por tus datos y volvé a cargar el archivo. Las claves existentes se actualizan en lugar de duplicarse.</p>
+          {summary && <small>{summary.total} procesadas · {summary.created} nuevas · {summary.updated} actualizadas · {summary.skipped} omitidas</small>}
+        </div>
+      </div>
     </section>
   );
 }
