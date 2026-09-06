@@ -244,11 +244,20 @@ export class DashboardService {
 
     const genericTotal = genericSummary.reduce((sum, row) => sum + row._count._all, 0);
     const genericAmount = genericSummary.reduce((sum, row) => sum + amount(row._sum.amount), 0);
+    const pendingStatuses = new Set<RecordStatus>([
+      RecordStatus.DRAFT,
+      RecordStatus.PENDING,
+    ]);
+    const approvedStatuses = new Set<RecordStatus>([
+      RecordStatus.APPROVED,
+      RecordStatus.ACTIVE,
+      RecordStatus.CLOSED,
+    ]);
     const pending = genericSummary
-      .filter((row) => [RecordStatus.DRAFT, RecordStatus.PENDING].includes(row.status))
+      .filter((row) => pendingStatuses.has(row.status))
       .reduce((sum, row) => sum + row._count._all, 0);
     const approved = genericSummary
-      .filter((row) => [RecordStatus.APPROVED, RecordStatus.ACTIVE, RecordStatus.CLOSED].includes(row.status))
+      .filter((row) => approvedStatuses.has(row.status))
       .reduce((sum, row) => sum + row._count._all, 0);
 
     const workIds = genericByWork.map((row) => row.workId).filter((id): id is string => Boolean(id));
