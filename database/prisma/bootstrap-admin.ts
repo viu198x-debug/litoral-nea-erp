@@ -96,9 +96,97 @@ async function ensureCoreRoles() {
   console.log(`Roles base sincronizados: ${adminRole.name} / ${managerRole.name}`);
 }
 
+
+async function ensureExtendedRolePermissions() {
+  const roles = await prisma.role.findMany({
+    where: {
+      code: {
+        in: [
+          "ADMIN_GENERAL",
+          "GERENTE_EMPRESA",
+          "ADM_COMPRAS_TESORERIA",
+          "ADM_CONTABLE_IMPOSITIVO",
+          "ADM_RRHH_DOCUMENTAL",
+          "TEC_JEFE_OBRA",
+          "TEC_OFICINA_TECNICA",
+          "TEC_EQUIPOS_LOGISTICA",
+        ],
+      },
+    },
+  });
+  const roleByCode = new Map(roles.map((role) => [role.code, role]));
+
+  const grant = async (roleCodes: string[], modules: string[], actions: string[]) => {
+    const permissions = await prisma.permission.findMany({
+      where: { module: { in: modules }, action: { in: actions } },
+    });
+    const rows = [];
+    for (const roleCode of roleCodes) {
+      const role = roleByCode.get(roleCode);
+      if (!role) continue;
+      for (const permission of permissions) {
+        rows.push({ roleId: role.id, permissionId: permission.id, allowed: true });
+      }
+    }
+    if (rows.length) {
+      await prisma.rolePermission.createMany({ data: rows, skipDuplicates: true });
+    }
+  };
+
+  const allPermissions = await prisma.permission.findMany();
+  const admin = roleByCode.get("ADMIN_GENERAL");
+  if (admin) {
+    await prisma.rolePermission.createMany({
+      data: allPermissions.map((permission) => ({
+        roleId: admin.id,
+        permissionId: permission.id,
+        allowed: true,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  await grant(
+    roles.map((role) => role.code),
+    ["notifications"],
+    ["view", "modify"],
+  );
+
+  await grant(
+    ["TEC_JEFE_OBRA", "TEC_OFICINA_TECNICA", "TEC_EQUIPOS_LOGISTICA"],
+    ["technical-workspace"],
+    ["view", "create", "modify", "download", "export"],
+  );
+
+  await grant(
+    ["ADM_RRHH_DOCUMENTAL"],
+    ["personnel-control", "safety", "assets"],
+    ["view", "create", "modify", "approve", "void", "download", "export"],
+  );
+
+  await grant(
+    ["TEC_JEFE_OBRA"],
+    ["personnel-control", "safety", "assets"],
+    ["view", "create", "modify", "download"],
+  );
+
+  await grant(
+    ["TEC_EQUIPOS_LOGISTICA"],
+    ["assets", "fleet", "machinery", "fuel", "fuel-estimates", "maintenance", "mechanics", "spare-parts", "insurance"],
+    ["view", "create", "modify", "download", "export"],
+  );
+
+  await grant(
+    ["ADM_COMPRAS_TESORERIA"],
+    ["stakeholders", "suppliers", "purchases", "insurance"],
+    ["view", "create", "modify", "approve", "void", "download", "export"],
+  );
+}
+
 async function main() {
   await ensureOperationalModules();
   await ensureCoreRoles();
+  await ensureExtendedRolePermissions();
   const email = (process.env.BOOTSTRAP_ADMIN_EMAIL ?? "admin@litoralnea.com").trim().toLowerCase();
   const password = process.env.BOOTSTRAP_ADMIN_PASSWORD;
   if (!password) {
