@@ -1973,6 +1973,22 @@ function NotificationCenterLivePanel() {
   );
 }
 
+type ModuleGridRow = {
+  id?: string;
+  code: string;
+  title: string;
+  details: string;
+  work: string;
+  date: string;
+  owner: string;
+  status: string;
+  amount: string;
+  rawStatus?: string;
+  rawData?: Record<string, unknown>;
+  rawAmount?: number | null;
+  rawOccurredAt?: string | null;
+};
+
 function ModulePage({
   module,
   onCreate,
@@ -1988,26 +2004,19 @@ function ModulePage({
 }) {
   const Icon = iconMap[module.icon] ?? Settings;
   const [localSearch, setLocalSearch] = useState("");
-  const [apiRows, setApiRows] = useState<Array<{
-    code: string;
-    title: string;
-    details: string;
-    work: string;
-    date: string;
-    owner: string;
-    status: string;
-    amount: string;
-  }>>([]);
+  const [apiRows, setApiRows] = useState<ModuleGridRow[]>([]);
+  const [editingRow, setEditingRow] = useState<ModuleGridRow | null>(null);
+  const [deletingId, setDeletingId] = useState("");
   const [loadingRows, setLoadingRows] = useState(!demoMode);
   const [refreshKey, setRefreshKey] = useState(0);
   const effectiveSearch = localSearch || search;
   const demoRows = useMemo(
     () =>
       [
-        { code: `${module.slug.slice(0, 4).toUpperCase()}-0001`, title: module.features[0], details: module.features.slice(1, 4).join(" · "), work: "OB-2026-001", date: "04/09/2026", owner: "Ana Gómez", status: "Activo", amount: "$2,40 M" },
-        { code: `${module.slug.slice(0, 4).toUpperCase()}-0002`, title: module.features[1] ?? "Registro", details: module.features.slice(2, 5).join(" · "), work: "OB-2026-005", date: "03/09/2026", owner: "Víctor Encina", status: "Pendiente", amount: "$850.000" },
-        { code: `${module.slug.slice(0, 4).toUpperCase()}-0003`, title: module.features[2] ?? "Registro", details: module.features.slice(3, 6).join(" · "), work: "OB-2026-003", date: "02/09/2026", owner: "María López", status: "Aprobado", amount: "$6,12 M" },
-        { code: `${module.slug.slice(0, 4).toUpperCase()}-0004`, title: module.features[3] ?? "Registro", details: module.features.slice(0, 3).join(" · "), work: "OB-2026-007", date: "01/09/2026", owner: "Carlos Ruiz", status: "Borrador", amount: "$1,26 M" },
+        { id: "demo-1", code: `${module.slug.slice(0, 4).toUpperCase()}-0001`, title: module.features[0], details: module.features.slice(1, 4).join(" · "), work: "OB-2026-001", date: "04/09/2026", owner: "Ana Gómez", status: "Activo", amount: "$2,40 M" },
+        { id: "demo-2", code: `${module.slug.slice(0, 4).toUpperCase()}-0002`, title: module.features[1] ?? "Registro", details: module.features.slice(2, 5).join(" · "), work: "OB-2026-005", date: "03/09/2026", owner: "Víctor Encina", status: "Pendiente", amount: "$850.000" },
+        { id: "demo-3", code: `${module.slug.slice(0, 4).toUpperCase()}-0003`, title: module.features[2] ?? "Registro", details: module.features.slice(3, 6).join(" · "), work: "OB-2026-003", date: "02/09/2026", owner: "María López", status: "Aprobado", amount: "$6,12 M" },
+        { id: "demo-4", code: `${module.slug.slice(0, 4).toUpperCase()}-0004`, title: module.features[3] ?? "Registro", details: module.features.slice(0, 3).join(" · "), work: "OB-2026-007", date: "01/09/2026", owner: "Carlos Ruiz", status: "Borrador", amount: "$1,26 M" },
       ].filter((row) =>
         `${row.code} ${row.title} ${row.work} ${row.owner}`
           .toLowerCase()
@@ -2035,6 +2044,7 @@ function ModulePage({
       .then(async (response) => {
         if (!response.ok) throw new Error("No se pudo cargar el módulo");
         return response.json() as Promise<Array<{
+          id: string;
           code: string;
           title: string;
           status: string;
@@ -2049,6 +2059,7 @@ function ModulePage({
       .then((items) => {
         setApiRows(
           items.map((item) => ({
+            id: item.id,
             code: item.code,
             title: item.title,
             details: (recordDefinitions[module.slug]?.fields ?? [])
@@ -2063,6 +2074,10 @@ function ModulePage({
             owner: `Usuario ${item.createdById.slice(-6)}`,
             status: item.status.charAt(0) + item.status.slice(1).toLowerCase(),
             amount: item.amount == null ? "—" : money(Number(item.amount)),
+            rawStatus: item.status,
+            rawData: item.data ?? {},
+            rawAmount: item.amount == null ? null : Number(item.amount),
+            rawOccurredAt: item.occurredAt ?? null,
           })),
         );
       })
@@ -2078,6 +2093,28 @@ function ModulePage({
       });
     return () => controller.abort();
   }, [effectiveSearch, module.slug, refreshKey]);
+
+  const canModifyRecord = user.allowedActions.includes("modify") || user.allowedActions.includes("admin");
+  const canVoidRecord = user.allowedActions.includes("void") || user.allowedActions.includes("admin");
+
+  const deleteRecord = async (row: ModuleGridRow) => {
+    if (demoMode || !row.id || !canVoidRecord) return;
+    if (!window.confirm(`Dar de baja ${row.code} · ${row.title}? La operación quedará auditada.`)) return;
+    setDeletingId(row.id);
+    try {
+      const response = await apiFetch(`/records/${module.slug}/${row.id}`, { method: "DELETE" });
+      if (!response.ok) {
+        const problem = (await response.json().catch(() => null)) as { message?: string | string[] } | null;
+        throw new Error(Array.isArray(problem?.message) ? problem.message.join(". ") : problem?.message ?? "La API rechazó la baja.");
+      }
+      toast.success("Baja registrada", { description: `${row.code} · trazabilidad conservada` });
+      window.dispatchEvent(new Event("lnea:records-changed"));
+    } catch (cause) {
+      toast.error("No se pudo dar de baja", { description: cause instanceof Error ? cause.message : "Error" });
+    } finally {
+      setDeletingId("");
+    }
+  };
 
   return (
     <>
@@ -2131,7 +2168,21 @@ function ModulePage({
                 <TableCell>{row.owner}</TableCell>
                 <TableCell>{row.amount}</TableCell>
                 <TableCell><StatusBadge status={row.status} /></TableCell>
-                <TableCell><button className="icon-button" onClick={() => toast.info(`Abriendo ${row.code}`)}><MoreHorizontal size={17} /></button></TableCell>
+                <TableCell>
+                  <div className="row-actions">
+                    {!demoMode && row.id && canModifyRecord && (
+                      <button className="table-action-link" type="button" onClick={() => setEditingRow(row)}>Modificar</button>
+                    )}
+                    {!demoMode && row.id && canVoidRecord && (
+                      <button className="table-action-link danger" type="button" disabled={deletingId === row.id} onClick={() => void deleteRecord(row)}>
+                        {deletingId === row.id ? "Bajando…" : "Baja"}
+                      </button>
+                    )}
+                    {(demoMode || (!canModifyRecord && !canVoidRecord)) && (
+                      <button className="icon-button" onClick={() => toast.info(`Consulta ${row.code}`)}><MoreHorizontal size={17} /></button>
+                    )}
+                  </div>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
@@ -2147,6 +2198,16 @@ function ModulePage({
           </div>
         ))}
       </section>
+      <RecordEditDialog
+        module={module}
+        row={editingRow}
+        open={Boolean(editingRow)}
+        onOpenChange={(open) => { if (!open) setEditingRow(null); }}
+        onSaved={() => {
+          setEditingRow(null);
+          window.dispatchEvent(new Event("lnea:records-changed"));
+        }}
+      />
       {module.slug === "system" && (
         <>
           <ModuleConfiguratorPanel />
@@ -2162,6 +2223,113 @@ function ModulePage({
         </>
       )}
     </>
+  );
+}
+
+function RecordEditDialog({
+  module,
+  row,
+  open,
+  onOpenChange,
+  onSaved,
+}: {
+  module: ModuleDefinition;
+  row: ModuleGridRow | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
+  const definition = module.recordDefinition ?? recordDefinitions[module.slug] ?? fallbackRecordDefinition;
+  const [title, setTitle] = useState("");
+  const [status, setStatus] = useState("ACTIVE");
+  const [values, setValues] = useState<Record<string, string | boolean>>({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!row) return;
+    setTitle(row.title);
+    setStatus(row.rawStatus ?? "ACTIVE");
+    const next: Record<string, string | boolean> = {};
+    for (const field of definition.fields) {
+      const value = row.rawData?.[field.key];
+      if (value === undefined || value === null) continue;
+      if (field.type === "date" && typeof value === "string") next[field.key] = value.slice(0, 10);
+      else if (field.type === "datetime-local" && typeof value === "string") next[field.key] = value.slice(0, 16);
+      else next[field.key] = typeof value === "boolean" ? value : String(value);
+    }
+    setValues(next);
+  }, [row?.id, module.slug]);
+
+  const save = async () => {
+    if (!row?.id || !title.trim()) return;
+    const missing = definition.fields.filter((field) => field.required && (values[field.key] === undefined || values[field.key] === ""));
+    if (missing.length) {
+      toast.error("Faltan datos obligatorios", { description: missing.map((field) => field.label).join(" · ") });
+      return;
+    }
+    const data = Object.fromEntries(
+      definition.fields
+        .filter((field) => values[field.key] !== undefined && values[field.key] !== "")
+        .map((field) => {
+          const value = values[field.key];
+          return [["number", "currency"].includes(field.type) ? Number(value) : value, field.key];
+        })
+        .map(([value, key]) => [key, value]),
+    );
+    setSaving(true);
+    try {
+      const response = await apiFetch(`/records/${module.slug}/${row.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: title.trim(),
+          status,
+          amount: definition.amountField ? Number(data[definition.amountField] ?? 0) : undefined,
+          data,
+        }),
+      });
+      if (!response.ok) {
+        const problem = (await response.json().catch(() => null)) as { message?: string | string[] } | null;
+        throw new Error(Array.isArray(problem?.message) ? problem.message.join(". ") : problem?.message ?? "La API rechazó la modificación.");
+      }
+      toast.success("Registro modificado", { description: `${row.code} · cambio auditado` });
+      onSaved();
+    } catch (cause) {
+      toast.error("No se pudo modificar", { description: cause instanceof Error ? cause.message : "Error" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="erp-dialog">
+        <DialogHeader>
+          <DialogTitle>Modificar · {row?.code}</DialogTitle>
+          <DialogDescription>Los cambios quedan registrados en auditoría y conservan la trazabilidad histórica.</DialogDescription>
+        </DialogHeader>
+        <div className="dialog-form">
+          <label className="form-field"><span>{definition.titleLabel} *</span><input value={title} onChange={(event) => setTitle(event.target.value)} /></label>
+          <label className="form-field"><span>Estado</span><select value={status} onChange={(event) => setStatus(event.target.value)}>
+            <option value="DRAFT">Borrador</option><option value="PENDING">Pendiente</option><option value="APPROVED">Aprobado</option><option value="ACTIVE">Activo</option><option value="CLOSED">Cerrado</option>
+          </select></label>
+          <div className="characteristic-fields">
+            {definition.fields.map((field) => (
+              <CharacteristicField
+                key={field.key}
+                field={field}
+                value={values[field.key] ?? (field.type === "boolean" ? false : "")}
+                onChange={(value) => setValues((current) => ({ ...current, [field.key]: value }))}
+              />
+            ))}
+          </div>
+        </div>
+        <DialogFooter>
+          <button className="button secondary" type="button" onClick={() => onOpenChange(false)}>Cancelar</button>
+          <button className="button primary" type="button" disabled={saving} onClick={() => void save()}><Check size={16} /> {saving ? "Guardando…" : "Guardar cambios"}</button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
