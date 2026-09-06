@@ -1,6 +1,6 @@
 # Validación de entrega
 
-Fecha de control: **4 de septiembre de 2026**.
+Fecha de control: **6 de septiembre de 2026**.
 
 ## Resultado
 
@@ -14,14 +14,14 @@ reportadas por npm en el árbol instalado.
 | --- | --- |
 | Instalación reproducible | `npm ci` completó desde `package-lock.json`. |
 | TypeScript | Frontend, backend y seed: sin errores. |
-| Pruebas automatizadas | 16/16 aprobadas: 10 backend/seguridad y 6 frontend. |
+| Pruebas automatizadas | 22/22 aprobadas: 12 backend/seguridad y 10 frontend. |
 | Compilación | NestJS y Next.js 16.3.4: compilación productiva correcta. |
 | Prisma | `validate`, `generate` y `migrate diff --from-empty`: correctos. |
 | Dependencias | `npm audit`: 0 vulnerabilidades conocidas, incluidas devDependencies. |
 | Demo | 33 módulos navegables, 8 obras y 7 usuarios definidos. |
 | HTTP estático | Portada, bundles, logo e imagen principal respondieron HTTP 200. |
 | Paquete Sites | Archivo de despliegue validado con `dist/index.html` y metadatos del proyecto. |
-| Docker Compose | YAML válido; cinco servicios, healthchecks y hardening presentes. |
+| Docker Compose | Desarrollo y producción: YAML válido; cinco servicios, healthchecks, PostgreSQL privado y HTTPS automático. |
 | Scripts operativos | Entry point y scripts de backup: sintaxis POSIX válida. |
 | Secretos | Sin claves privadas ni patrones de credenciales reales en archivos versionables. |
 | Patrones peligrosos | Sin `eval`, `new Function`, HTML crudo ni consultas Prisma inseguras. |
@@ -36,6 +36,9 @@ reportadas por npm en el árbol instalado.
   de aprobación exclusiva de Administración.
 - Dashboard general, listado y dashboard de ocho obras.
 - Los 33 módulos, creación modular, búsqueda, actualización de tabla y API REST.
+- Formularios característicos para los 29 módulos registrables, con campos
+  obligatorios, tipos, obra/centro de costo, adjuntos y validación de servidor.
+- Configurador auditable de módulos, campos, permisos por rol y ocho workflows.
 - Documentos con límite, versionado, firma de archivo, MIME canónico, SHA-256 y
   descarga controlada.
 - RBAC por usuario, rol, módulo, acción y obra; workflows configurables.

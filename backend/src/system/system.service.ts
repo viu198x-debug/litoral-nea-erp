@@ -3,6 +3,26 @@ import { AuditAction, Prisma, RegistrationStatus, UserStatus } from "@prisma/cli
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import { PrismaService } from "../prisma/prisma.service";
+import type { AuthUser } from "../common/current-user.decorator";
+import type {
+  CreateModuleDto,
+  CreateModuleFieldDto,
+  SetRoleModulePermissionDto,
+  UpdateModuleDto,
+  UpdateModuleFieldDto,
+} from "./dto/module-config.dto";
+import type { CreateWorkflowDto, UpdateWorkflowDto } from "./dto/workflow-config.dto";
+
+const permissionActions = [
+  "view",
+  "create",
+  "modify",
+  "approve",
+  "void",
+  "download",
+  "export",
+  "admin",
+] as const;
 
 @Injectable()
 export class SystemService {
@@ -72,6 +92,253 @@ export class SystemService {
       },
       orderBy: { name: "asc" },
     });
+  }
+
+  modules() {
+    return this.prisma.moduleConfiguration.findMany({
+      include: {
+        fields: {
+          where: { active: true },
+          orderBy: { sortOrder: "asc" },
+        },
+      },
+      orderBy: [{ groupName: "asc" }, { sortOrder: "asc" }, { label: "asc" }],
+    });
+  }
+
+  async availableModules(user: AuthUser) {
+    const configurations = await this.prisma.moduleConfiguration.findMany({
+      where: { active: true },
+      include: {
+        fields: { where: { active: true }, orderBy: { sortOrder: "asc" } },
+      },
+      orderBy: [{ groupName: "asc" }, { sortOrder: "asc" }],
+    });
+    if (user.roleCodes.includes("ADMIN_GENERAL")) {
+      return configurations.map((module) => ({ ...module, actions: [...permissionActions] }));
+    }
+    const [rolePermissions, directPermissions] = await Promise.all([
+      this.prisma.rolePermission.findMany({
+        where: {
+          allowed: true,
+          role: { users: { some: { userId: user.id } } },
+        },
+        include: { permission: true },
+      }),
+      this.prisma.userPermission.findMany({
+        where: { userId: user.id, workId: null },
+        include: { permission: true },
+      }),
+    ]);
+    const actions = new Map<string, Set<string>>();
+    for (const item of rolePermissions) {
+      const current = actions.get(item.permission.module) ?? new Set<string>();
+      current.add(item.permission.action);
+      actions.set(item.permission.module, current);
+    }
+    for (const item of directPermissions) {
+      const current = actions.get(item.permission.module) ?? new Set<string>();
+      if (item.allowed) current.add(item.permission.action);
+      else current.delete(item.permission.action);
+      actions.set(item.permission.module, current);
+    }
+    return configurations
+      .filter((module) => actions.get(module.slug)?.has("view"))
+      .map((module) => ({ ...module, actions: [...(actions.get(module.slug) ?? [])] }));
+  }
+
+  async createModule(dto: CreateModuleDto, actorId: string) {
+    const exists = await this.prisma.moduleConfiguration.findUnique({
+      where: { slug: dto.slug },
+    });
+    if (exists) throw new BadRequestException("Ya existe un módulo con ese código");
+    return this.prisma.$transaction(async (tx) => {
+      const module = await tx.moduleConfiguration.create({
+        data: { ...dto, isSystem: false },
+      });
+      await Promise.all(
+        permissionActions.map((action) =>
+          tx.permission.upsert({
+            where: { module_action: { module: dto.slug, action } },
+            create: { module: dto.slug, action },
+            update: {},
+          }),
+        ),
+      );
+      await tx.auditLog.create({
+        data: {
+          userId: actorId,
+          action: AuditAction.CREATE,
+          module: "system",
+          entityType: "module-configuration",
+          entityId: module.id,
+          after: dto as unknown as Prisma.InputJsonValue,
+        },
+      });
+      return module;
+    });
+  }
+
+  async updateModule(id: string, dto: UpdateModuleDto, actorId: string) {
+    const current = await this.prisma.moduleConfiguration.findUnique({ where: { id } });
+    if (!current) throw new NotFoundException("Módulo no encontrado");
+    if (current.isSystem && dto.slug && dto.slug !== current.slug) {
+      throw new BadRequestException("No se puede cambiar el código de un módulo del sistema");
+    }
+    const updated = await this.prisma.moduleConfiguration.update({
+      where: { id },
+      data: dto,
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        userId: actorId,
+        action: AuditAction.UPDATE,
+        module: "system",
+        entityType: "module-configuration",
+        entityId: id,
+        before: current as unknown as Prisma.InputJsonValue,
+        after: updated as unknown as Prisma.InputJsonValue,
+      },
+    });
+    return updated;
+  }
+
+  async createModuleField(id: string, dto: CreateModuleFieldDto, actorId: string) {
+    const module = await this.prisma.moduleConfiguration.findUnique({ where: { id } });
+    if (!module) throw new NotFoundException("Módulo no encontrado");
+    const field = await this.prisma.moduleFieldConfiguration.create({
+      data: {
+        ...dto,
+        moduleId: id,
+        options: (dto.options ?? []) as Prisma.InputJsonValue,
+        settings: (dto.settings ?? {}) as Prisma.InputJsonValue,
+      },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        userId: actorId,
+        action: AuditAction.CREATE,
+        module: "system",
+        entityType: "module-field-configuration",
+        entityId: field.id,
+        after: { module: module.slug, ...dto } as Prisma.InputJsonValue,
+      },
+    });
+    return field;
+  }
+
+  async updateModuleField(id: string, dto: UpdateModuleFieldDto, actorId: string) {
+    const current = await this.prisma.moduleFieldConfiguration.findUnique({ where: { id } });
+    if (!current) throw new NotFoundException("Campo no encontrado");
+    const updated = await this.prisma.moduleFieldConfiguration.update({
+      where: { id },
+      data: {
+        ...dto,
+        options: dto.options as Prisma.InputJsonValue | undefined,
+        settings: dto.settings as Prisma.InputJsonValue | undefined,
+      },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        userId: actorId,
+        action: AuditAction.UPDATE,
+        module: "system",
+        entityType: "module-field-configuration",
+        entityId: id,
+        before: current as unknown as Prisma.InputJsonValue,
+        after: updated as unknown as Prisma.InputJsonValue,
+      },
+    });
+    return updated;
+  }
+
+  async setRolePermission(dto: SetRoleModulePermissionDto, actorId: string) {
+    const [role, permission] = await Promise.all([
+      this.prisma.role.findUnique({ where: { code: dto.roleCode } }),
+      this.prisma.permission.findUnique({
+        where: { module_action: { module: dto.module, action: dto.action } },
+      }),
+    ]);
+    if (!role) throw new NotFoundException("Rol no encontrado");
+    if (!permission) throw new NotFoundException("Permiso no encontrado");
+    const result = await this.prisma.rolePermission.upsert({
+      where: { roleId_permissionId: { roleId: role.id, permissionId: permission.id } },
+      create: { roleId: role.id, permissionId: permission.id, allowed: dto.allowed },
+      update: { allowed: dto.allowed },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        userId: actorId,
+        action: AuditAction.UPDATE,
+        module: "system",
+        entityType: "role-permission",
+        entityId: `${role.id}:${permission.id}`,
+        after: dto as unknown as Prisma.InputJsonValue,
+      },
+    });
+    return result;
+  }
+
+  workflows() {
+    return this.prisma.workflowDefinition.findMany({
+      orderBy: [{ module: "asc" }, { version: "desc" }, { name: "asc" }],
+    });
+  }
+
+  async createWorkflow(dto: CreateWorkflowDto, actorId: string) {
+    if (dto.maxAmount !== undefined && dto.minAmount !== undefined && dto.maxAmount < dto.minAmount) {
+      throw new BadRequestException("El monto máximo no puede ser menor al mínimo");
+    }
+    const module = await this.prisma.moduleConfiguration.findUnique({ where: { slug: dto.module } });
+    if (!module?.active) throw new NotFoundException("Módulo activo no encontrado");
+    const created = await this.prisma.workflowDefinition.create({
+      data: {
+        ...dto,
+        minAmount: dto.minAmount,
+        maxAmount: dto.maxAmount,
+        steps: dto.steps as unknown as Prisma.InputJsonValue,
+      },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        userId: actorId,
+        action: AuditAction.CREATE,
+        module: "system",
+        entityType: "workflow-definition",
+        entityId: created.id,
+        after: dto as unknown as Prisma.InputJsonValue,
+      },
+    });
+    return created;
+  }
+
+  async updateWorkflow(id: string, dto: UpdateWorkflowDto, actorId: string) {
+    const current = await this.prisma.workflowDefinition.findUnique({ where: { id } });
+    if (!current) throw new NotFoundException("Flujo no encontrado");
+    const minAmount = dto.minAmount ?? (current.minAmount ? Number(current.minAmount) : undefined);
+    const maxAmount = dto.maxAmount ?? (current.maxAmount ? Number(current.maxAmount) : undefined);
+    if (maxAmount !== undefined && minAmount !== undefined && maxAmount < minAmount) {
+      throw new BadRequestException("El monto máximo no puede ser menor al mínimo");
+    }
+    const updated = await this.prisma.workflowDefinition.update({
+      where: { id },
+      data: {
+        ...dto,
+        steps: dto.steps as unknown as Prisma.InputJsonValue | undefined,
+      },
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        userId: actorId,
+        action: AuditAction.UPDATE,
+        module: "system",
+        entityType: "workflow-definition",
+        entityId: id,
+        before: current as unknown as Prisma.InputJsonValue,
+        after: updated as unknown as Prisma.InputJsonValue,
+      },
+    });
+    return updated;
   }
 
   registrationRequests(companyId: string, status?: RegistrationStatus) {

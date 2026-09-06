@@ -51,22 +51,44 @@ export class WorksService {
   }
 
   async create(companyId: string, dto: CreateWorkDto) {
-    return this.prisma.work.create({
-      data: {
-        ...dto,
-        companyId,
-        startDate: dto.startDate ? new Date(dto.startDate) : undefined,
-        contractualEndDate: dto.contractualEndDate
-          ? new Date(dto.contractualEndDate)
-          : undefined,
-      },
+    const { clientName, organizationType, ...workData } = dto;
+    return this.prisma.$transaction(async (tx) => {
+      let clientId = dto.clientId;
+      if (!clientId && clientName) {
+        const existing = await tx.organization.findFirst({
+          where: {
+            legalName: { equals: clientName, mode: "insensitive" },
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        clientId = existing?.id ?? (await tx.organization.create({
+          data: {
+            legalName: clientName,
+            type: organizationType ?? "PRIVATE",
+          },
+          select: { id: true },
+        })).id;
+      }
+      return tx.work.create({
+        data: {
+          ...workData,
+          clientId,
+          companyId,
+          startDate: dto.startDate ? new Date(dto.startDate) : undefined,
+          contractualEndDate: dto.contractualEndDate
+            ? new Date(dto.contractualEndDate)
+            : undefined,
+        },
+      });
     });
   }
 
   async update(companyId: string, id: string, dto: UpdateWorkDto) {
     await this.get(companyId, id);
+    const { clientName, organizationType, ...workData } = dto;
     const data: Prisma.WorkUpdateInput = {
-      ...dto,
+      ...workData,
       startDate: dto.startDate ? new Date(dto.startDate) : undefined,
       contractualEndDate: dto.contractualEndDate
         ? new Date(dto.contractualEndDate)

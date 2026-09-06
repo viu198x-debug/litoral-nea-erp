@@ -1,0 +1,128 @@
+name: litoral-nea-erp-production
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Definir POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:?Definir POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Definir POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [erp_internal]
+    security_opt: [no-new-privileges:true]
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      API_PREFIX: api/v1
+      FRONTEND_URL: https://${ERP_DOMAIN:?Definir ERP_DOMAIN}
+      BACKEND_PUBLIC_URL: https://${ERP_DOMAIN:?Definir ERP_DOMAIN}
+      TRUST_PROXY: "true"
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Definir JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Definir JWT_REFRESH_SECRET}
+      CSRF_SECRET: ${CSRF_SECRET:?Definir CSRF_SECRET}
+      JWT_ISSUER: litoral-nea-erp
+      JWT_AUDIENCE: litoral-nea-api
+      ACCESS_TOKEN_TTL: 15m
+      REFRESH_TOKEN_DAYS: 7
+      COOKIE_SECURE: "true"
+      MAX_LOGIN_ATTEMPTS: 5
+      LOCK_MINUTES: 15
+      MAX_ACTIVE_SESSIONS: 5
+      RATE_LIMIT_TTL_MS: 60000
+      RATE_LIMIT_MAX: 120
+      JSON_BODY_LIMIT: 1mb
+      ALLOW_SELF_APPROVAL: "false"
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      MICROSOFT_CLIENT_ID: ${MICROSOFT_CLIENT_ID:-}
+      MICROSOFT_CLIENT_SECRET: ${MICROSOFT_CLIENT_SECRET:-}
+      MICROSOFT_TENANT: ${MICROSOFT_TENANT:-common}
+      DOCUMENT_STORAGE_PATH: /app/storage/documents
+      MAX_UPLOAD_MB: ${MAX_UPLOAD_MB:-50}
+      SEED_DEMO: "false"
+    volumes:
+      - document_storage:/app/storage/documents
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [erp_internal]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp:size=128m,mode=1777]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:4000/api/v1/health >/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: /api/v1
+        NEXT_PUBLIC_DEMO_MODE: "false"
+    restart: unless-stopped
+    networks: [erp_internal]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+  gateway:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    environment:
+      ERP_DOMAIN: ${ERP_DOMAIN:?Definir ERP_DOMAIN}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend: { condition: service_started }
+      backend: { condition: service_healthy }
+    networks: [erp_internal]
+    security_opt: [no-new-privileges:true]
+
+  backup:
+    build:
+      context: .
+      dockerfile: docker/backup.Dockerfile
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: ${POSTGRES_DB}
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-30}
+      BACKUP_CRON: "${BACKUP_CRON:-0 2 * * *}"
+    volumes: [./backups:/backups]
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [erp_internal]
+    security_opt: [no-new-privileges:true]
+
+volumes:
+  postgres_data:
+  document_storage:
+  caddy_data:
+  caddy_config:
+
+networks:
+  erp_internal:
+    driver: bridge

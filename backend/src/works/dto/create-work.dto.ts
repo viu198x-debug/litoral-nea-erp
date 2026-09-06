@@ -1,4 +1,4 @@
-import { WorkStatus } from "@prisma/client";
+import { OrganizationType, WorkStatus } from "@prisma/client";
 import {
   IsDateString,
   IsEnum,
@@ -29,6 +29,15 @@ export class CreateWorkDto {
   @IsOptional()
   @Matches(/^c[a-z0-9]{20,32}$/)
   clientId?: string;
+
+  @IsString()
+  @IsOptional()
+  @MaxLength(200)
+  clientName?: string;
+
+  @IsEnum(OrganizationType)
+  @IsOptional()
+  organizationType?: OrganizationType;
 
   @IsString()
   @MaxLength(80)

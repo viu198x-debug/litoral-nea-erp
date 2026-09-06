@@ -11,6 +11,8 @@ import {
   WorkStatus,
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { modules as moduleUiDefinitions } from "../../frontend/lib/modules";
+import { recordDefinitions } from "../../frontend/lib/record-definitions";
 
 const prisma = new PrismaClient();
 
@@ -227,6 +229,66 @@ async function main() {
     }
   }
 
+  for (const [sortOrder, definition] of moduleUiDefinitions.entries()) {
+    const recordDefinition = recordDefinitions[definition.slug];
+    const configured = await prisma.moduleConfiguration.upsert({
+      where: { slug: definition.slug },
+      update: {
+        label: definition.label,
+        groupName: definition.group,
+        icon: definition.icon,
+        summary: definition.summary,
+        active: true,
+        requiresWork: recordDefinition?.requiresWork ?? false,
+        sortOrder,
+      },
+      create: {
+        slug: definition.slug,
+        label: definition.label,
+        groupName: definition.group,
+        icon: definition.icon,
+        summary: definition.summary,
+        active: true,
+        requiresWork: recordDefinition?.requiresWork ?? false,
+        isSystem: true,
+        sortOrder,
+      },
+    });
+    for (const [fieldOrder, field] of (recordDefinition?.fields ?? []).entries()) {
+      await prisma.moduleFieldConfiguration.upsert({
+        where: {
+          moduleId_fieldKey: { moduleId: configured.id, fieldKey: field.key },
+        },
+        update: {
+          label: field.label,
+          fieldType: field.type === "datetime-local" ? "datetime" : field.type,
+          required: field.required ?? false,
+          options: field.options ?? [],
+          settings: {
+            placeholder: field.placeholder ?? null,
+            section: field.section ?? null,
+          },
+          sortOrder: fieldOrder,
+          active: true,
+        },
+        create: {
+          moduleId: configured.id,
+          fieldKey: field.key,
+          label: field.label,
+          fieldType: field.type === "datetime-local" ? "datetime" : field.type,
+          required: field.required ?? false,
+          options: field.options ?? [],
+          settings: {
+            placeholder: field.placeholder ?? null,
+            section: field.section ?? null,
+          },
+          sortOrder: fieldOrder,
+          active: true,
+        },
+      });
+    }
+  }
+
   const roles = {
     admin: await prisma.role.upsert({
       where: { code: "ADMIN_GENERAL" },
@@ -284,7 +346,23 @@ async function main() {
     { roleId: roles.siteLead.id, modules: ["dashboard", "works", "documents", "planning", "progress", "public-works", "certificates", "dossiers", "purchases", "logistics", "stock", "fleet", "fuel", "machinery"], createModules: ["documents", "progress", "certificates", "dossiers", "purchases", "logistics", "stock", "fuel"], actions: ["view", "create", "modify", "download"] },
     { roleId: roles.technicalOffice.id, modules: ["dashboard", "works", "documents", "architecture", "engineering", "budgets", "planning", "progress", "public-works", "certificates"], createModules: ["documents", "architecture", "engineering", "budgets", "planning", "progress", "public-works", "certificates"], actions: ["view", "create", "modify", "download"] },
     { roleId: roles.equipment.id, modules: ["dashboard", "works", "documents", "logistics", "stock", "fleet", "drivers", "fuel", "machinery", "concrete", "maintenance"], createModules: ["documents", "logistics", "stock", "fleet", "drivers", "fuel", "machinery", "concrete", "maintenance"], actions: ["view", "create", "modify", "download"] },
-  ];
+];
+
+function demoFieldValue(
+  field: (typeof recordDefinitions)[string]["fields"][number],
+  index: number,
+) {
+  if (field.options?.length) return field.options[0];
+  if (field.type === "boolean") return false;
+  if (field.type === "number") return index + 1;
+  if (field.type === "currency") return 125_000 * (index + 1);
+  if (field.type === "date") return `2026-09-${String((index % 20) + 1).padStart(2, "0")}`;
+  if (field.type === "datetime-local") return `2026-09-${String((index % 20) + 1).padStart(2, "0")}T08:00`;
+  if (field.type === "email") return `contacto${index + 1}@proveedor.example`;
+  if (field.type === "tax-id") return `30-${String(71000000 + index).padStart(8, "0")}-${index % 10}`;
+  if (field.type === "textarea") return `Detalle demostrativo para ${field.label.toLowerCase()}.`;
+  return `${field.label} demo ${index + 1}`;
+}
   await prisma.rolePermission.createMany({
     data: [
       ...allPermissions.map((permission) => ({
@@ -815,25 +893,34 @@ async function main() {
     });
   }
 
-  if ((await prisma.genericRecord.count()) === 0) {
-    const demoModules = modules.filter(
-      (module) =>
-        !["dashboard", "works", "documents", "system", "management"].includes(
-          module,
-        ),
+  const demoModules = modules.filter(
+    (module) => !["dashboard", "works", "documents", "system", "management", "approvals"].includes(module),
+  );
+  for (const [index, module] of demoModules.entries()) {
+    const definition = recordDefinitions[module];
+    const ui = moduleUiDefinitions.find((item) => item.slug === module);
+    if (!definition) continue;
+    const code = `${definition.codePrefix}-${String(index + 1).padStart(4, "0")}`;
+    const data = Object.fromEntries(
+      definition.fields.map((field) => [field.key, demoFieldValue(field, index)]),
     );
-    await prisma.genericRecord.createMany({
-      data: demoModules.map((module, index) => ({
+    await prisma.genericRecord.upsert({
+      where: { module_code: { module, code } },
+      update: {
+        title: `${ui?.label ?? module} · registro demostrativo`,
+        data,
+      },
+      create: {
         module,
-        workId: works[index % works.length].id,
-        code: `${module.toUpperCase().slice(0, 5)}-${String(index + 1).padStart(4, "0")}`,
-        title: `Registro demo de ${module}`,
+        workId: definition.requiresWork ? works[index % works.length].id : null,
+        code,
+        title: `${ui?.label ?? module} · registro demostrativo`,
         status: index % 3 === 0 ? RecordStatus.PENDING : RecordStatus.ACTIVE,
-        amount: [0, 850_000, 2_400_000][index % 3],
+        amount: definition.amountField ? 850_000 + index * 125_000 : null,
         occurredAt: new Date(2026, 8, Math.min(28, index + 1)),
-        data: { demo: true, source: "seed" },
+        data,
         createdById: admin.id,
-      })),
+      },
     });
   }
 

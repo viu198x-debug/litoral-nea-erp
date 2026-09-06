@@ -184,6 +184,43 @@ model Permission {
   @@unique([module, action])
 }
 
+model ModuleConfiguration {
+  id           String                     @id @default(cuid())
+  slug         String                     @unique
+  label        String
+  groupName    String
+  icon         String                     @default("FileText")
+  summary      String
+  active       Boolean                    @default(true)
+  requiresWork Boolean                    @default(false)
+  isSystem     Boolean                    @default(false)
+  sortOrder    Int                        @default(0)
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+  fields       ModuleFieldConfiguration[]
+
+  @@index([active, groupName, sortOrder])
+}
+
+model ModuleFieldConfiguration {
+  id          String              @id @default(cuid())
+  moduleId    String
+  fieldKey    String
+  label       String
+  fieldType   String
+  required    Boolean             @default(false)
+  options     Json                @default("[]")
+  settings    Json                @default("{}")
+  sortOrder   Int                 @default(0)
+  active      Boolean             @default(true)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  module      ModuleConfiguration @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+
+  @@unique([moduleId, fieldKey])
+  @@index([moduleId, active, sortOrder])
+}
+
 model UserRole {
   id         String   @id @default(cuid())
   userId     String

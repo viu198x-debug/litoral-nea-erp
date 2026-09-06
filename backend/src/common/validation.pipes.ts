@@ -39,7 +39,7 @@ export const ERP_MODULES = new Set([
 @Injectable()
 export class ModuleSlugPipe implements PipeTransform<string, string> {
   transform(value: string) {
-    if (!ERP_MODULES.has(value)) {
+    if (!/^[a-z][a-z0-9-]{1,48}$/.test(value)) {
       throw new BadRequestException("Módulo no válido");
     }
     return value;

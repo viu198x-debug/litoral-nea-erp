@@ -88,9 +88,14 @@ import {
 import { activity, alerts, cashflow, works } from "@frontend/lib/demo-data";
 import { demoAccounts, findDemoAccount } from "@frontend/lib/demo-users";
 import { groups, modules } from "@frontend/lib/modules";
+import {
+  fallbackRecordDefinition,
+  recordDefinitions,
+} from "@frontend/lib/record-definitions";
 import type {
   DemoUser,
   ModuleDefinition,
+  RecordFieldDefinition,
   Work,
 } from "@frontend/lib/types";
 
@@ -204,6 +209,8 @@ export function ErpApp() {
   const [createOpen, setCreateOpen] = useState(false);
   const [globalSearch, setGlobalSearch] = useState("");
   const [runtimeWorks, setRuntimeWorks] = useState<Work[]>(works);
+  const [runtimeModules, setRuntimeModules] = useState<ModuleDefinition[]>(modules);
+  const [configurationRefresh, setConfigurationRefresh] = useState(0);
 
   useEffect(() => {
     const desktop = window.matchMedia("(min-width: 821px)");
@@ -214,6 +221,53 @@ export function ErpApp() {
     desktop.addEventListener("change", keepDrawerMobileOnly);
     return () => desktop.removeEventListener("change", keepDrawerMobileOnly);
   }, []);
+
+  useEffect(() => {
+    const refresh = () => setConfigurationRefresh((value) => value + 1);
+    window.addEventListener("lnea:module-config-changed", refresh);
+    return () => window.removeEventListener("lnea:module-config-changed", refresh);
+  }, []);
+
+  useEffect(() => {
+    if (!user || demoMode || !apiUrl) return;
+    void apiFetch("/configuration/modules")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("No se pudo cargar el menú autorizado");
+        return response.json() as Promise<Array<ConfiguratorModule & { icon: string; actions: string[] }>>;
+      })
+      .then((configured) => {
+        setRuntimeModules(configured.map((module) => ({
+          slug: module.slug,
+          label: module.label,
+          group: module.groupName,
+          icon: module.icon,
+          summary: module.summary,
+          features: module.fields.map((field) => field.label),
+          recordDefinition: {
+            codePrefix: module.slug.replace(/[^a-z0-9]/gi, "").slice(0, 5).toUpperCase() || "REG",
+            titleLabel: "Descripción principal",
+            requiresWork: module.requiresWork,
+            fields: module.fields
+              .filter((field) => field.active)
+              .map((field) => ({
+                key: field.fieldKey,
+                label: field.label,
+                type: field.fieldType === "datetime" ? "datetime-local" : field.fieldType as RecordFieldDefinition["type"],
+                required: field.required,
+                options: field.options,
+              })),
+          },
+        })));
+        setUser((current) => current ? {
+          ...current,
+          allowedModules: configured.map((module) => module.slug),
+          allowedCreateModules: configured.filter((module) => module.actions.includes("create")).map((module) => module.slug),
+        } : current);
+      })
+      .catch((cause) => toast.error("No se actualizó el menú", {
+        description: cause instanceof Error ? cause.message : "Error de conexión",
+      }));
+  }, [user?.email, configurationRefresh]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -259,7 +313,7 @@ export function ErpApp() {
   useEffect(() => {
     const syncHash = () => {
       const parts = window.location.hash.replace(/^#\/?/, "").split("/");
-      if (parts[0] && modules.some((module) => module.slug === parts[0])) {
+      if (parts[0] && runtimeModules.some((module) => module.slug === parts[0])) {
         setActiveSlug(parts[0]);
       }
       if (parts[0] === "works" && parts[1]) {
@@ -269,7 +323,7 @@ export function ErpApp() {
     syncHash();
     window.addEventListener("hashchange", syncHash);
     return () => window.removeEventListener("hashchange", syncHash);
-  }, []);
+  }, [runtimeModules]);
 
   useEffect(() => {
     if (user && !canUseModule(user, activeSlug)) {
@@ -378,11 +432,12 @@ export function ErpApp() {
   }
 
   const activeModule =
-    modules.find((module) => module.slug === activeSlug) ?? modules[0];
+    runtimeModules.find((module) => module.slug === activeSlug) ?? runtimeModules[0] ?? modules[0];
   const availableWorks = user.assignedWorks.length
     ? runtimeWorks.filter((work) => user.assignedWorks.includes(work.code))
     : runtimeWorks;
-  const mayCreate = canCreateInModule(user, activeModule.slug);
+  const mayCreate = !["dashboard", "management", "approvals", "system"].includes(activeModule.slug)
+    && canCreateInModule(user, activeModule.slug);
 
   return (
     <>
@@ -394,6 +449,7 @@ export function ErpApp() {
             onNavigate={navigate}
             user={user}
             onLogout={logout}
+            moduleItems={runtimeModules}
           />
         </aside>
 
@@ -408,6 +464,7 @@ export function ErpApp() {
               onNavigate={navigate}
               user={user}
               onLogout={logout}
+              moduleItems={runtimeModules}
             />
           </SheetContent>
         </Sheet>
@@ -896,14 +953,16 @@ function Navigation({
   onNavigate,
   user,
   onLogout,
+  moduleItems,
 }: {
   activeSlug: string;
   onNavigate: (slug: string) => void;
   user: DemoUser;
   onLogout: () => void;
+  moduleItems: ModuleDefinition[];
 }) {
   const [filter, setFilter] = useState("");
-  const visibleModules = modules.filter(
+  const visibleModules = moduleItems.filter(
     (module) =>
       canUseModule(user, module.slug) &&
       `${module.label} ${module.summary}`.toLowerCase().includes(filter.toLowerCase()),
@@ -928,7 +987,7 @@ function Navigation({
         />
       </label>
       <nav className="sidebar-nav" aria-label="Módulos">
-        {groups.map((group) => {
+        {[...new Set(moduleItems.map((module) => module.group))].map((group) => {
           const groupModules = visibleModules.filter(
             (module) => module.group === group,
           );
@@ -1513,6 +1572,7 @@ function ModulePage({
   const [apiRows, setApiRows] = useState<Array<{
     code: string;
     title: string;
+    details: string;
     work: string;
     date: string;
     owner: string;
@@ -1525,10 +1585,10 @@ function ModulePage({
   const demoRows = useMemo(
     () =>
       [
-        { code: `${module.slug.slice(0, 4).toUpperCase()}-0001`, title: module.features[0], work: "OB-2026-001", date: "04/09/2026", owner: "Ana Gómez", status: "Activo", amount: "$2,40 M" },
-        { code: `${module.slug.slice(0, 4).toUpperCase()}-0002`, title: module.features[1] ?? "Registro", work: "OB-2026-005", date: "03/09/2026", owner: "Víctor Encina", status: "Pendiente", amount: "$850.000" },
-        { code: `${module.slug.slice(0, 4).toUpperCase()}-0003`, title: module.features[2] ?? "Registro", work: "OB-2026-003", date: "02/09/2026", owner: "María López", status: "Aprobado", amount: "$6,12 M" },
-        { code: `${module.slug.slice(0, 4).toUpperCase()}-0004`, title: module.features[3] ?? "Registro", work: "OB-2026-007", date: "01/09/2026", owner: "Carlos Ruiz", status: "Borrador", amount: "$1,26 M" },
+        { code: `${module.slug.slice(0, 4).toUpperCase()}-0001`, title: module.features[0], details: module.features.slice(1, 4).join(" · "), work: "OB-2026-001", date: "04/09/2026", owner: "Ana Gómez", status: "Activo", amount: "$2,40 M" },
+        { code: `${module.slug.slice(0, 4).toUpperCase()}-0002`, title: module.features[1] ?? "Registro", details: module.features.slice(2, 5).join(" · "), work: "OB-2026-005", date: "03/09/2026", owner: "Víctor Encina", status: "Pendiente", amount: "$850.000" },
+        { code: `${module.slug.slice(0, 4).toUpperCase()}-0003`, title: module.features[2] ?? "Registro", details: module.features.slice(3, 6).join(" · "), work: "OB-2026-003", date: "02/09/2026", owner: "María López", status: "Aprobado", amount: "$6,12 M" },
+        { code: `${module.slug.slice(0, 4).toUpperCase()}-0004`, title: module.features[3] ?? "Registro", details: module.features.slice(0, 3).join(" · "), work: "OB-2026-007", date: "01/09/2026", owner: "Carlos Ruiz", status: "Borrador", amount: "$1,26 M" },
       ].filter((row) =>
         `${row.code} ${row.title} ${row.work} ${row.owner}`
           .toLowerCase()
@@ -1563,6 +1623,7 @@ function ModulePage({
           occurredAt?: string | null;
           updatedAt: string;
           createdById: string;
+          data?: Record<string, unknown>;
           work?: { code: string } | null;
         }>>;
       })
@@ -1571,6 +1632,11 @@ function ModulePage({
           items.map((item) => ({
             code: item.code,
             title: item.title,
+            details: (recordDefinitions[module.slug]?.fields ?? [])
+              .slice(0, 3)
+              .map((field) => item.data?.[field.key] == null ? "" : `${field.label}: ${String(item.data[field.key])}`)
+              .filter(Boolean)
+              .join(" · ") || "Sin datos adicionales",
             work: item.work?.code ?? "General",
             date: new Intl.DateTimeFormat("es-AR").format(
               new Date(item.occurredAt ?? item.updatedAt),
@@ -1634,18 +1700,19 @@ function ModulePage({
           </div>
         </div>
         <Table className="erp-table module-table">
-          <TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Descripción</TableHead><TableHead>Obra</TableHead><TableHead>Fecha</TableHead><TableHead>Responsable</TableHead><TableHead>Importe</TableHead><TableHead>Estado</TableHead><TableHead /></TableRow></TableHeader>
+          <TableHeader><TableRow><TableHead>Código</TableHead><TableHead>Descripción</TableHead><TableHead>Datos característicos</TableHead><TableHead>Obra</TableHead><TableHead>Fecha</TableHead><TableHead>Responsable</TableHead><TableHead>Importe</TableHead><TableHead>Estado</TableHead><TableHead /></TableRow></TableHeader>
           <TableBody>
             {loadingRows && (
-              <TableRow><TableCell colSpan={8}><span className="table-loading">Consultando registros…</span></TableCell></TableRow>
+              <TableRow><TableCell colSpan={9}><span className="table-loading">Consultando registros…</span></TableCell></TableRow>
             )}
             {!loadingRows && rows.length === 0 && (
-              <TableRow><TableCell colSpan={8}><span className="table-loading">No se encontraron registros.</span></TableCell></TableRow>
+              <TableRow><TableCell colSpan={9}><span className="table-loading">No se encontraron registros.</span></TableCell></TableRow>
             )}
             {rows.map((row) => (
               <TableRow key={row.code}>
                 <TableCell><span className="code-cell">{row.code}</span></TableCell>
                 <TableCell><span className="table-primary">{row.title}</span></TableCell>
+                <TableCell><span className="table-details">{row.details}</span></TableCell>
                 <TableCell>{row.work}</TableCell>
                 <TableCell>{row.date}</TableCell>
                 <TableCell>{row.owner}</TableCell>
@@ -1669,6 +1736,8 @@ function ModulePage({
       </section>
       {module.slug === "system" && (
         <>
+          <ModuleConfiguratorPanel />
+          <WorkflowConfiguratorPanel />
           <UserRolesPanel />
           <RegistrationRequestsPanel />
           <section className="security-note">
@@ -1679,6 +1748,312 @@ function ModulePage({
         </>
       )}
     </>
+  );
+}
+
+type ConfiguratorField = {
+  id?: string;
+  fieldKey: string;
+  label: string;
+  fieldType: string;
+  required: boolean;
+  active: boolean;
+  options?: string[];
+};
+
+type ConfiguratorModule = {
+  id?: string;
+  slug: string;
+  label: string;
+  groupName: string;
+  summary: string;
+  active: boolean;
+  requiresWork: boolean;
+  fields: ConfiguratorField[];
+};
+
+const initialConfiguratorModules: ConfiguratorModule[] = modules.map((module) => ({
+  slug: module.slug,
+  label: module.label,
+  groupName: module.group,
+  summary: module.summary,
+  active: true,
+  requiresWork: recordDefinitions[module.slug]?.requiresWork ?? false,
+  fields: (recordDefinitions[module.slug]?.fields ?? []).map((field) => ({
+    fieldKey: field.key,
+    label: field.label,
+    fieldType: field.type === "datetime-local" ? "datetime" : field.type,
+    required: field.required ?? false,
+    active: true,
+  })),
+}));
+
+function ModuleConfiguratorPanel() {
+  const [items, setItems] = useState<ConfiguratorModule[]>(initialConfiguratorModules);
+  const [selectedSlug, setSelectedSlug] = useState("works");
+  const [fieldLabel, setFieldLabel] = useState("");
+  const [fieldType, setFieldType] = useState("text");
+  const [newModule, setNewModule] = useState({ slug: "", label: "", groupName: "Operaciones", summary: "" });
+  const [busy, setBusy] = useState(false);
+  const [permissionState, setPermissionState] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    if (demoMode) return;
+    void apiFetch("/system/modules")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("No se pudo cargar la configuración");
+        return response.json() as Promise<ConfiguratorModule[]>;
+      })
+      .then(setItems)
+      .catch((cause) => toast.error("Configurador no disponible", {
+        description: cause instanceof Error ? cause.message : "Error de conexión",
+      }));
+  }, []);
+
+  const selected = items.find((item) => item.slug === selectedSlug) ?? items[0];
+
+  const updateModule = async (changes: Partial<ConfiguratorModule>) => {
+    if (!selected) return;
+    setItems((current) => current.map((item) => item.slug === selected.slug ? { ...item, ...changes } : item));
+    if (!demoMode && selected.id) {
+      const response = await apiFetch(`/system/modules/${selected.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(changes),
+      });
+      if (!response.ok) throw new Error("No se pudo actualizar el módulo");
+    }
+    window.dispatchEvent(new Event("lnea:module-config-changed"));
+  };
+
+  const addField = async () => {
+    if (!selected || !fieldLabel.trim()) return;
+    const fieldKey = fieldLabel
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^A-Za-z0-9]+(.)/g, (_match, character: string) => character.toUpperCase())
+      .replace(/^[A-Z]/, (character) => character.toLowerCase());
+    if (!/^[a-z][A-Za-z0-9]{1,48}$/.test(fieldKey)) {
+      toast.error("El nombre del campo no genera un código válido");
+      return;
+    }
+    setBusy(true);
+    try {
+      let created: ConfiguratorField = { fieldKey, label: fieldLabel.trim(), fieldType, required: false, active: true };
+      if (!demoMode && selected.id) {
+        const response = await apiFetch(`/system/modules/${selected.id}/fields`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...created, sortOrder: selected.fields.length }),
+        });
+        if (!response.ok) throw new Error("La API rechazó el nuevo campo");
+        created = await response.json() as ConfiguratorField;
+      }
+      setItems((current) => current.map((item) => item.slug === selected.slug ? { ...item, fields: [...item.fields, created] } : item));
+      setFieldLabel("");
+      window.dispatchEvent(new Event("lnea:module-config-changed"));
+      toast.success("Campo agregado", { description: `${selected.label} · ${created.label}` });
+    } catch (cause) {
+      toast.error("No se agregó el campo", { description: cause instanceof Error ? cause.message : "Error" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const updateField = async (field: ConfiguratorField, changes: Partial<ConfiguratorField>) => {
+    if (!selected) return;
+    setItems((current) => current.map((item) => item.slug === selected.slug
+      ? { ...item, fields: item.fields.map((candidate) => candidate.fieldKey === field.fieldKey ? { ...candidate, ...changes } : candidate) }
+      : item));
+    try {
+      if (!demoMode && field.id) {
+        const response = await apiFetch(`/system/module-fields/${field.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(changes),
+        });
+        if (!response.ok) throw new Error("La API rechazó el cambio");
+      }
+      window.dispatchEvent(new Event("lnea:module-config-changed"));
+    } catch (cause) {
+      toast.error("No se actualizó el campo", { description: cause instanceof Error ? cause.message : "Error" });
+    }
+  };
+
+  const createModule = async () => {
+    if (!/^[a-z][a-z0-9-]{1,48}$/.test(newModule.slug) || !newModule.label.trim() || !newModule.summary.trim()) {
+      toast.error("Completá código, nombre y descripción del módulo");
+      return;
+    }
+    setBusy(true);
+    try {
+      let created: ConfiguratorModule = { ...newModule, active: true, requiresWork: false, fields: [] };
+      if (!demoMode) {
+        const response = await apiFetch("/system/modules", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...newModule, icon: "FileText", sortOrder: items.length }),
+        });
+        if (!response.ok) throw new Error("La API rechazó el módulo");
+        created = { ...(await response.json() as ConfiguratorModule), fields: [] };
+      }
+      setItems((current) => [...current, created]);
+      setSelectedSlug(created.slug);
+      setNewModule({ slug: "", label: "", groupName: "Operaciones", summary: "" });
+      window.dispatchEvent(new Event("lnea:module-config-changed"));
+      toast.success("Módulo creado", { description: "Definí ahora sus campos y permisos." });
+    } catch (cause) {
+      toast.error("No se creó el módulo", { description: cause instanceof Error ? cause.message : "Error" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const permissionKey = (role: string, action: string) => `${role}:${selected?.slug}:${action}`;
+  const hasBasePermission = (account: DemoUser, action: string) => {
+    if (account.allowedModules.includes("*")) return true;
+    if (action === "view") return account.allowedModules.includes(selected?.slug ?? "");
+    if (["create", "modify"].includes(action)) return account.allowedCreateModules.includes(selected?.slug ?? "");
+    return account.allowedActions.includes(action) && account.allowedModules.includes(selected?.slug ?? "");
+  };
+  const changePermission = async (account: DemoUser, action: string, allowed: boolean) => {
+    const key = permissionKey(account.roleCode, action);
+    setPermissionState((current) => ({ ...current, [key]: allowed }));
+    if (!demoMode && selected) {
+      const response = await apiFetch("/system/role-permissions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roleCode: account.roleCode, module: selected.slug, action, allowed }),
+      });
+      if (!response.ok) toast.error("No se actualizó el permiso");
+    }
+  };
+
+  return (
+    <section className="panel module-configurator">
+      <div className="panel-heading"><div><span className="panel-kicker">CONFIGURACIÓN ADMINISTRATIVA</span><h2>Módulos, campos y permisos</h2></div><span className="registration-count">{items.length} módulos</span></div>
+      <div className="configurator-layout">
+        <aside>
+          <label className="form-field"><span>Módulo</span><select value={selected?.slug ?? ""} onChange={(event) => setSelectedSlug(event.target.value)}>{items.map((item) => <option value={item.slug} key={item.slug}>{item.label}</option>)}</select></label>
+          {selected && <div className="module-switches"><label><input type="checkbox" checked={selected.active} onChange={(event) => void updateModule({ active: event.target.checked })} /> Módulo activo</label><label><input type="checkbox" checked={selected.requiresWork} onChange={(event) => void updateModule({ requiresWork: event.target.checked })} /> Obra obligatoria</label></div>}
+          <div className="new-module-box"><strong>Nuevo módulo</strong><input placeholder="Código: calidad" value={newModule.slug} onChange={(event) => setNewModule({ ...newModule, slug: event.target.value.toLowerCase() })} /><input placeholder="Nombre" value={newModule.label} onChange={(event) => setNewModule({ ...newModule, label: event.target.value })} /><select value={newModule.groupName} onChange={(event) => setNewModule({ ...newModule, groupName: event.target.value })}>{groups.map((group) => <option key={group}>{group}</option>)}</select><textarea rows={2} placeholder="Objetivo del módulo" value={newModule.summary} onChange={(event) => setNewModule({ ...newModule, summary: event.target.value })} /><button className="button primary" disabled={busy} onClick={() => void createModule()}><Plus size={16} /> Crear módulo</button></div>
+        </aside>
+        <div className="configurator-main">
+          <div className="configured-fields"><div className="configurator-subheading"><strong>Campos de registración · {selected?.label}</strong><small>{selected?.fields.length ?? 0} campos característicos</small></div><div className="field-chip-grid">{selected?.fields.map((field) => <span key={field.fieldKey}><strong>{field.label}</strong><small>{field.fieldType}</small><label><input type="checkbox" checked={field.required} onChange={(event) => void updateField(field, { required: event.target.checked })} /> Obligatorio</label><label><input type="checkbox" checked={field.active} onChange={(event) => void updateField(field, { active: event.target.checked })} /> Activo</label></span>)}</div><div className="add-field-row"><input value={fieldLabel} onChange={(event) => setFieldLabel(event.target.value)} placeholder="Nombre del nuevo campo" /><select value={fieldType} onChange={(event) => setFieldType(event.target.value)}>{["text", "textarea", "number", "currency", "date", "datetime", "select", "boolean", "email", "tax-id", "file"].map((type) => <option key={type}>{type}</option>)}</select><button className="button secondary" disabled={busy || !fieldLabel.trim()} onClick={() => void addField()}><Plus size={16} /> Agregar</button></div></div>
+          <div className="permission-matrix"><div className="configurator-subheading"><strong>Permisos por rol</strong><small>Los cambios se auditan en el servidor</small></div><div className="permission-table"><div className="permission-row header"><strong>Rol</strong>{["view", "create", "modify", "approve", "void", "export"].map((action) => <span key={action}>{action}</span>)}</div>{demoAccounts.map((account) => <div className="permission-row" key={account.roleCode}><strong>{account.role}</strong>{["view", "create", "modify", "approve", "void", "export"].map((action) => {const key = permissionKey(account.roleCode, action); const checked = permissionState[key] ?? hasBasePermission(account, action); return <label key={action}><input type="checkbox" checked={checked} onChange={(event) => void changePermission(account, action, event.target.checked)} /><span className="sr-only">{action}</span></label>;})}</div>)}</div></div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+type ConfiguratorWorkflow = {
+  id?: string;
+  code: string;
+  module: string;
+  name: string;
+  minAmount?: number | string | null;
+  maxAmount?: number | string | null;
+  active: boolean;
+  version: number;
+  steps: Array<{ role: string; label: string }>;
+};
+
+const initialWorkflows: ConfiguratorWorkflow[] = [
+  ["WF-COMPRAS-01", "purchases", "Aprobación de compras"],
+  ["WF-PAGOS-01", "payments", "Aprobación de pagos"],
+  ["WF-VIATICOS-01", "per-diems", "Aprobación de viáticos"],
+  ["WF-PRESUP-01", "budgets", "Aprobación de presupuestos"],
+  ["WF-CERT-01", "certificates", "Aprobación de certificados"],
+  ["WF-DOC-01", "documents", "Aprobación documental"],
+  ["WF-HHEE-01", "payroll", "Aprobación de horas extra"],
+  ["WF-OT-01", "maintenance", "Aprobación de órdenes de trabajo"],
+].map(([code, module, name]) => ({
+  code,
+  module,
+  name,
+  active: true,
+  version: 1,
+  steps: [
+    { role: "ADMIN_OBRAS", label: "Control administrativo" },
+    { role: "ADMIN_GENERAL", label: "Aprobación final" },
+  ],
+}));
+
+function WorkflowConfiguratorPanel() {
+  const [items, setItems] = useState<ConfiguratorWorkflow[]>(initialWorkflows);
+  const [selectedCode, setSelectedCode] = useState(initialWorkflows[0].code);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (demoMode) return;
+    void apiFetch("/system/workflows")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("No se pudieron cargar los flujos");
+        return response.json() as Promise<ConfiguratorWorkflow[]>;
+      })
+      .then((workflows) => {
+        setItems(workflows);
+        if (workflows[0]) setSelectedCode(workflows[0].code);
+      })
+      .catch((cause) => toast.error("Flujos no disponibles", {
+        description: cause instanceof Error ? cause.message : "Error de conexión",
+      }));
+  }, []);
+
+  const selected = items.find((item) => item.code === selectedCode) ?? items[0];
+  const change = (changes: Partial<ConfiguratorWorkflow>) => {
+    if (!selected) return;
+    setItems((current) => current.map((item) => item.code === selected.code ? { ...item, ...changes } : item));
+  };
+  const changeStep = (index: number, role: string) => {
+    if (!selected) return;
+    const account = demoAccounts.find((candidate) => candidate.roleCode === role);
+    change({ steps: selected.steps.map((step, position) => position === index ? { role, label: account?.role ?? role } : step) });
+  };
+  const save = async () => {
+    if (!selected) return;
+    setSaving(true);
+    try {
+      if (!demoMode && selected.id) {
+        const response = await apiFetch(`/system/workflows/${selected.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            active: selected.active,
+            minAmount: selected.minAmount === "" || selected.minAmount == null ? undefined : Number(selected.minAmount),
+            maxAmount: selected.maxAmount === "" || selected.maxAmount == null ? undefined : Number(selected.maxAmount),
+            steps: selected.steps,
+          }),
+        });
+        if (!response.ok) throw new Error("La API rechazó la configuración");
+      } else {
+        await new Promise((resolve) => window.setTimeout(resolve, 220));
+      }
+      toast.success("Flujo guardado", { description: `${selected.name} · versión ${selected.version}` });
+    } catch (cause) {
+      toast.error("No se guardó el flujo", { description: cause instanceof Error ? cause.message : "Error" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!selected) return null;
+  return (
+    <section className="panel workflow-configurator">
+      <div className="panel-heading"><div><span className="panel-kicker">MOTOR DE APROBACIONES</span><h2>Flujos por operación y monto</h2></div><span className="registration-count">{items.length} flujos</span></div>
+      <div className="workflow-grid">
+        <label className="form-field"><span>Proceso</span><select value={selected.code} onChange={(event) => setSelectedCode(event.target.value)}>{items.map((item) => <option value={item.code} key={item.code}>{item.name}</option>)}</select></label>
+        <label className="form-field"><span>Monto mínimo</span><input type="number" min="0" value={selected.minAmount ?? ""} onChange={(event) => change({ minAmount: event.target.value })} /></label>
+        <label className="form-field"><span>Monto máximo</span><input type="number" min="0" value={selected.maxAmount ?? ""} onChange={(event) => change({ maxAmount: event.target.value })} /></label>
+        <label className="workflow-active"><input type="checkbox" checked={selected.active} onChange={(event) => change({ active: event.target.checked })} /> Flujo activo</label>
+      </div>
+      <div className="workflow-steps">
+        {selected.steps.map((step, index) => <label key={`${selected.code}-${index}`}><span>{index + 1}</span><small>Paso {index + 1}</small><select value={step.role} onChange={(event) => changeStep(index, event.target.value)}>{demoAccounts.map((account) => <option value={account.roleCode} key={account.roleCode}>{account.role}</option>)}</select></label>)}
+        <button className="button secondary" type="button" onClick={() => change({ steps: [...selected.steps, { role: "ADMIN_GENERAL", label: "Aprobación final" }] })}><Plus size={16} /> Agregar paso</button>
+      </div>
+      <div className="workflow-footer"><small>{selected.module} · {selected.code} · todas las modificaciones quedan auditadas</small><button className="button primary" disabled={saving} type="button" onClick={() => void save()}><Check size={16} /> {saving ? "Guardando…" : "Guardar flujo"}</button></div>
+    </section>
   );
 }
 
@@ -1868,9 +2243,12 @@ function QuickCreateDialog({
   module: ModuleDefinition;
   workItems: Work[];
 }) {
+  const definition = module.recordDefinition ?? recordDefinitions[module.slug] ?? fallbackRecordDefinition;
   const [title, setTitle] = useState("");
   const [workId, setWorkId] = useState(workItems[0]?.id ?? "");
-  const [occurredAt, setOccurredAt] = useState("2026-09-04");
+  const [occurredAt, setOccurredAt] = useState(() => new Date().toISOString().slice(0, 10));
+  const [status, setStatus] = useState("DRAFT");
+  const [fieldValues, setFieldValues] = useState<Record<string, string | boolean>>({});
   const [file, setFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -1878,9 +2256,42 @@ function QuickCreateDialog({
     if (!workId && workItems[0]) setWorkId(workItems[0].id);
   }, [workId, workItems]);
 
+  useEffect(() => {
+    setTitle("");
+    setFieldValues({});
+    setFile(null);
+    setStatus("DRAFT");
+  }, [module.slug]);
+
+  const setFieldValue = (key: string, value: string | boolean) =>
+    setFieldValues((current) => ({ ...current, [key]: value }));
+
+  const normalizedData = Object.fromEntries(
+    definition.fields
+      .filter((field) => fieldValues[field.key] !== undefined && fieldValues[field.key] !== "")
+      .map((field) => {
+        const value = fieldValues[field.key];
+        if (["number", "currency"].includes(field.type)) return [field.key, Number(value)];
+        return [field.key, value];
+      }),
+  );
+
   const save = async () => {
     if (!title.trim()) {
-      toast.error("Completá la descripción");
+      toast.error(`Completá: ${definition.titleLabel}`);
+      return;
+    }
+    const missing = definition.fields.filter(
+      (field) => field.required && (fieldValues[field.key] === undefined || fieldValues[field.key] === ""),
+    );
+    if (missing.length) {
+      toast.error("Faltan datos obligatorios", {
+        description: missing.map((field) => field.label).join(" · "),
+      });
+      return;
+    }
+    if (definition.requiresWork && !workId) {
+      toast.error("Seleccioná la obra / centro de costo");
       return;
     }
     setSaving(true);
@@ -1893,25 +2304,63 @@ function QuickCreateDialog({
           form.append("module", module.slug);
           form.append("title", title.trim());
           if (workId) form.append("workId", workId);
+          const documentDescription = [
+            normalizedData.documentType,
+            normalizedData.revision ? `Revisión ${normalizedData.revision}` : "",
+            normalizedData.versionNotes,
+          ].filter(Boolean).join(" · ");
+          if (documentDescription) form.append("description", documentDescription);
           response = await apiFetch("/documents", {
             method: "POST",
             body: form,
           });
         } else if (module.slug === "works") {
-          throw new Error(
-            "La alta de obra requiere completar la ficha contractual.",
-          );
+          response = await apiFetch("/works", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              code: `${definition.codePrefix}-${Date.now().toString().slice(-8)}`,
+              name: title.trim(),
+              status: "PLANNING",
+              clientName: normalizedData.client,
+              organizationType: ({
+                "Ministerio": "MINISTRY",
+                "Municipio": "MUNICIPALITY",
+                "Organismo público": "PUBLIC_AGENCY",
+                "Privado": "PRIVATE",
+              } as Record<string, string>)[String(normalizedData.organizationType)] ?? "PRIVATE",
+              costCenter: normalizedData.costCenter,
+              agency: normalizedData.agency,
+              ministry: normalizedData.ministry,
+              municipality: normalizedData.municipality,
+              contractNumber: normalizedData.contractNumber,
+              dossierNumber: normalizedData.dossierNumber,
+              address: normalizedData.address,
+              city: normalizedData.city,
+              latitude: normalizedData.latitude,
+              longitude: normalizedData.longitude,
+              startDate: normalizedData.startDate,
+              contractualEndDate: normalizedData.contractualEndDate,
+              contractAmount: normalizedData.contractAmount,
+              targetBudget: normalizedData.targetBudget,
+              responsibleName: normalizedData.responsibleName,
+              notes: normalizedData.notes,
+            }),
+          });
         } else {
           response = await apiFetch(`/records/${module.slug}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              code: `${module.slug.toUpperCase().slice(0, 5)}-${Date.now()}`,
+              code: `${definition.codePrefix}-${Date.now()}`,
               title: title.trim(),
               workId: workId || undefined,
               occurredAt,
-              status: "DRAFT",
-              data: { source: "web" },
+              status,
+              amount: definition.amountField
+                ? Number(normalizedData[definition.amountField] ?? 0)
+                : undefined,
+              data: normalizedData,
             }),
           });
         }
@@ -1925,6 +2374,23 @@ function QuickCreateDialog({
               : problem?.message ?? "La API rechazó el registro.",
           );
         }
+        const created = await response.json().catch(() => null) as { id?: string } | null;
+        if (file && module.slug !== "documents" && created?.id) {
+          const attachment = new FormData();
+          attachment.append("file", file);
+          attachment.append("module", module.slug);
+          attachment.append("title", `${module.label} · ${title.trim()}`);
+          attachment.append("entityType", module.slug === "works" ? "work" : "generic-record");
+          attachment.append("entityId", created.id);
+          if (module.slug === "works") attachment.append("workId", created.id);
+          else if (workId) attachment.append("workId", workId);
+          const attachmentResponse = await apiFetch("/documents", { method: "POST", body: attachment });
+          if (!attachmentResponse.ok) {
+            toast.warning("Registro guardado sin adjunto", {
+              description: "El archivo fue rechazado; puede adjuntarse nuevamente desde Documentación.",
+            });
+          }
+        }
         toast.success("Registro guardado", {
           description: `${module.label} · auditoría generada`,
         });
@@ -1936,6 +2402,7 @@ function QuickCreateDialog({
         });
       }
       setTitle("");
+      setFieldValues({});
       setFile(null);
       onOpenChange(false);
     } catch (cause) {
@@ -1957,11 +2424,23 @@ function QuickCreateDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="dialog-form">
-          <label className="form-field"><span>Descripción</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Descripción del registro" /></label>
-          <label className="form-field"><span>Obra / centro de costo</span><select value={workId} onChange={(event) => setWorkId(event.target.value)}>{workItems.map((work) => <option value={work.id} key={work.id}>{work.code} · {work.name}</option>)}</select></label>
+          <label className="form-field"><span>{definition.titleLabel} *</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder={definition.titleLabel} /></label>
+          {module.slug !== "works" && (
+            <label className="form-field"><span>Obra / centro de costo{definition.requiresWork ? " *" : ""}</span><select value={workId} onChange={(event) => setWorkId(event.target.value)}>{!definition.requiresWork && <option value="">General / sin obra</option>}{workItems.map((work) => <option value={work.id} key={work.id}>{work.code} · {work.name}</option>)}</select></label>
+          )}
           <div className="two-fields">
             <label className="form-field"><span>Fecha</span><input type="date" value={occurredAt} onChange={(event) => setOccurredAt(event.target.value)} /></label>
-            <label className="form-field"><span>Estado</span><select defaultValue="DRAFT"><option value="DRAFT">Borrador</option><option value="PENDING">Pendiente</option><option value="ACTIVE">Activo</option></select></label>
+            <label className="form-field"><span>Estado</span><select value={status} onChange={(event) => setStatus(event.target.value)}><option value="DRAFT">Borrador</option><option value="PENDING">Pendiente</option><option value="ACTIVE">Activo</option></select></label>
+          </div>
+          <div className="characteristic-fields">
+            {definition.fields.map((field) => (
+              <CharacteristicField
+                key={field.key}
+                field={field}
+                value={fieldValues[field.key] ?? (field.type === "boolean" ? false : "")}
+                onChange={(value) => setFieldValue(field.key, value)}
+              />
+            ))}
           </div>
           <label className="upload-zone"><Upload size={22} /><span><strong>{file ? file.name : "Adjuntar documentación"}</strong><small>PDF, XLSX, DOCX, DWG, DXF, JPG, PNG o ZIP</small></span><input type="file" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>
         </div>
@@ -1971,6 +2450,43 @@ function QuickCreateDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function CharacteristicField({
+  field,
+  value,
+  onChange,
+}: {
+  field: RecordFieldDefinition;
+  value: string | boolean;
+  onChange: (value: string | boolean) => void;
+}) {
+  if (field.type === "boolean") {
+    return (
+      <label className="form-field boolean-field">
+        <input type="checkbox" checked={Boolean(value)} onChange={(event) => onChange(event.target.checked)} />
+        <span>{field.label}{field.required ? " *" : ""}</span>
+      </label>
+    );
+  }
+  if (field.type === "textarea") {
+    return (
+      <label className="form-field field-wide"><span>{field.label}{field.required ? " *" : ""}</span><textarea rows={3} value={String(value)} onChange={(event) => onChange(event.target.value)} placeholder={field.placeholder} /></label>
+    );
+  }
+  if (field.type === "select") {
+    return (
+      <label className="form-field"><span>{field.label}{field.required ? " *" : ""}</span><select value={String(value)} onChange={(event) => onChange(event.target.value)}><option value="">Seleccionar…</option>{field.options?.map((option) => <option key={option} value={option}>{option}</option>)}</select></label>
+    );
+  }
+  const inputType = field.type === "currency" || field.type === "number"
+    ? "number"
+    : field.type === "tax-id"
+      ? "text"
+      : field.type;
+  return (
+    <label className="form-field"><span>{field.label}{field.required ? " *" : ""}</span><input type={inputType} step={field.type === "currency" ? "0.01" : field.type === "number" ? "any" : undefined} value={String(value)} onChange={(event) => onChange(event.target.value)} placeholder={field.placeholder} /></label>
   );
 }
 

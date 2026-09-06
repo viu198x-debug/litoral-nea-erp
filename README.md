@@ -13,6 +13,7 @@ La solución se entrega como monorepo:
 - **backend/**: API REST modular con NestJS.
 - **database/**: modelo PostgreSQL, Prisma, migraciones y seed.
 - **docker/**: proxy, imágenes, backups y scripts de arranque.
+- **docker-compose.production.yml**: despliegue VPS con PostgreSQL privado y HTTPS automático.
 - **docs/**: arquitectura, API, seguridad, instalación y producción.
 
 ## Inicio rápido con Docker
@@ -88,8 +89,10 @@ Servicios por defecto:
 La dirección pública entregada al finalizar ejecuta el frontend navegable con
 datos ficticios y no almacena información real. La API NestJS, PostgreSQL,
 OAuth real, documentos persistentes y backups se activan desplegando este mismo
-repositorio con Docker en un VPS o servidor local. Google Drive se usa para
-conservar el paquete fuente, no como servidor de ejecución de PostgreSQL/NestJS.
+repositorio con la guía `docs/PRODUCCION.md`. La instalación real requiere un
+VPS, un dominio apuntado a su IP y secretos suministrados fuera de Git.
+Google Drive se usa para conservar el paquete fuente, no como servidor de
+ejecución de PostgreSQL/NestJS.
 
 ## Criterio contable e impositivo
 

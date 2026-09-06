@@ -68,3 +68,21 @@ test("la navegación de escritorio ocupa la primera columna con ancho fijo", asy
   assert.match(css, /\.erp-main \{\s*grid-column: 2;/);
   assert.match(source, /<Toaster richColors position="top-right" \/>\s*<div className="erp-app">\s*<aside className="desktop-sidebar">/);
 });
+
+test("los 29 módulos registrables tienen formularios con datos característicos", async () => {
+  const source = await readFile(new URL("../lib/record-definitions.ts", import.meta.url), "utf8");
+  assert.equal((source.match(/codePrefix:/g) ?? []).length - 1, 29);
+  for (const characteristic of [
+    "Monto contractual", "Número de plano", "Curva S", "Fondo de reparo",
+    "CUIT", "Stock mínimo", "Conciliado", "Débito fiscal", "RTO / VTV",
+    "Horómetro", "Costo por m³", "Cargas sociales", "Comprobantes",
+  ]) assert.match(source, new RegExp(characteristic.replace("/", "\\/")));
+});
+
+test("el configurador convierte módulos dinámicos en formularios operativos", async () => {
+  const source = await readFile(new URL("../components/erp-app.tsx", import.meta.url), "utf8");
+  assert.match(source, /recordDefinition: \{/);
+  assert.match(source, /module\.recordDefinition \?\?/);
+  assert.match(source, /updateField/);
+  assert.match(source, /function WorkflowConfiguratorPanel/);
+});

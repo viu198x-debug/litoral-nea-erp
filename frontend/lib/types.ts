@@ -24,6 +24,38 @@ export interface ModuleDefinition {
   summary: string;
   features: string[];
   primaryMetric?: string;
+  recordDefinition?: ModuleRecordDefinition;
+}
+
+export type RecordFieldType =
+  | "text"
+  | "textarea"
+  | "number"
+  | "currency"
+  | "date"
+  | "datetime-local"
+  | "select"
+  | "boolean"
+  | "email"
+  | "tax-id"
+  | "file";
+
+export interface RecordFieldDefinition {
+  key: string;
+  label: string;
+  type: RecordFieldType;
+  required?: boolean;
+  options?: string[];
+  placeholder?: string;
+  section?: string;
+}
+
+export interface ModuleRecordDefinition {
+  codePrefix: string;
+  titleLabel: string;
+  requiresWork?: boolean;
+  amountField?: string;
+  fields: RecordFieldDefinition[];
 }
 
 export interface DemoUser {

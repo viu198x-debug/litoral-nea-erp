@@ -1,5 +1,4 @@
-import { IsIn, IsOptional, IsString, Matches, MaxLength } from "class-validator";
-import { ERP_MODULES } from "../../common/validation.pipes";
+import { IsOptional, IsString, Matches, MaxLength } from "class-validator";
 
 export class CreateDocumentDto {
   @IsString()
@@ -8,7 +7,7 @@ export class CreateDocumentDto {
   workId?: string;
 
   @IsString()
-  @IsIn([...ERP_MODULES])
+  @Matches(/^[a-z][a-z0-9-]{1,48}$/)
   module: string;
 
   @IsString()

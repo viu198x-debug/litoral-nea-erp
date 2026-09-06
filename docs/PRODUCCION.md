@@ -25,6 +25,27 @@
 
 6. Comprobar /api/v1/health, login, una lectura con permisos y una descarga.
 
+### Instalación segura con dominio y HTTPS automático
+
+La variante recomendada usa `docker-compose.production.yml`. PostgreSQL queda
+aislado en la red interna y Caddy obtiene y renueva gratuitamente el certificado
+TLS de Let's Encrypt.
+
+~~~bash
+cp .env.production.example .env.production
+# Completar el archivo sin conservar ningún valor GENERAR_...
+set -a
+. ./.env.production
+set +a
+./scripts/preflight-production.sh
+docker compose --env-file .env.production -f docker-compose.production.yml build --pull
+docker compose --env-file .env.production -f docker-compose.production.yml up -d
+docker compose --env-file .env.production -f docker-compose.production.yml ps
+~~~
+
+Antes de iniciar, el registro DNS A/AAAA de `ERP_DOMAIN` debe apuntar al VPS y
+los puertos 80/443 deben estar habilitados. No se publica el puerto 5432.
+
 El validador de entorno detiene deliberadamente el backend en producción si
 detecta HTTP, cookies no seguras, credenciales de ejemplo, comodines CORS,
 secretos débiles/repetidos, `SEED_DEMO=true` o pares OAuth incompletos.

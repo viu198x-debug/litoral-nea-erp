@@ -98,3 +98,17 @@ test("los técnicos quedan limitados a las obras asignadas", async () => {
   assert.match(dashboard, /restrictToAssignedWorks/);
   assert.match(dashboard, /members: \{ some: \{ userId, endDate: null \} \}/);
 });
+
+test("los módulos, campos, permisos y workflows se configuran con auditoría", async () => {
+  const controller = await readFile(new URL("../src/system/system.controller.ts", import.meta.url), "utf8");
+  const service = await readFile(new URL("../src/system/system.service.ts", import.meta.url), "utf8");
+  const records = await readFile(new URL("../src/records/records.service.ts", import.meta.url), "utf8");
+  assert.match(controller, /@Post\("modules"\)/);
+  assert.match(controller, /@Patch\("module-fields\/:id"\)/);
+  assert.match(controller, /@Patch\("role-permissions"\)/);
+  assert.match(controller, /@Patch\("workflows\/:id"\)/);
+  assert.match(service, /entityType: "module-configuration"/);
+  assert.match(service, /entityType: "workflow-definition"/);
+  assert.match(records, /validateConfiguredData/);
+  assert.match(records, /Faltan campos obligatorios/);
+});
