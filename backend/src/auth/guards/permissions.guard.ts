@@ -69,13 +69,7 @@ export class PermissionsGuard implements CanActivate {
         )?.workId ?? null;
     }
     if (!workId && params.id && path.includes("/records/")) {
-      workId =
-        (
-          await this.prisma.genericRecord.findFirst({
-            where: { id: params.id, module, deletedAt: null },
-            select: { workId: true },
-          })
-        )?.workId ?? null;
+      workId = await this.resolveRecordWorkId(module, params.id);
     }
     if (!workId && params.id && path.includes("/approvals/")) {
       workId =
@@ -144,5 +138,65 @@ export class PermissionsGuard implements CanActivate {
       );
     }
     return true;
+  }  private async resolveRecordWorkId(module: string, id: string): Promise<string | null> {
+    switch (module) {
+      case "budgets":
+        return (await this.prisma.budget.findFirst({ where: { id, deletedAt: null }, select: { workId: true } }))?.workId ?? null;
+      case "progress":
+        return (await this.prisma.dailyReport.findFirst({ where: { id, deletedAt: null }, select: { workId: true } }))?.workId ?? null;
+      case "certificates":
+        return (await this.prisma.certificate.findFirst({ where: { id, deletedAt: null }, select: { workId: true } }))?.workId ?? null;
+      case "dossiers":
+        return (await this.prisma.dossier.findFirst({ where: { id, deletedAt: null }, select: { workId: true } }))?.workId ?? null;
+      case "purchases":
+        return (await this.prisma.purchaseOrder.findFirst({ where: { id, deletedAt: null }, select: { workId: true } }))?.workId ?? null;
+      case "cash":
+      case "banks":
+      case "payments":
+        return (await this.prisma.financialMovement.findFirst({ where: { id, deletedAt: null }, select: { workId: true } }))?.workId ?? null;
+      case "fleet":
+        return (await this.prisma.vehicle.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      case "fuel":
+        return (await this.prisma.fuelLog.findFirst({ where: { id, voidedAt: null }, select: { workId: true } }))?.workId ?? null;
+      case "machinery":
+        return (await this.prisma.machine.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      case "maintenance":
+        return (await this.prisma.maintenanceOrder.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      case "fuel-estimates":
+        return (await this.prisma.fuelEstimate.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      case "insurance":
+        return (await this.prisma.insurancePolicy.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      case "unexpected-tasks":
+        return (await this.prisma.unexpectedTask.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      case "technical-workspace":
+        return (await this.prisma.technicalTask.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      case "personnel-control":
+        return (await this.prisma.attendanceRecord.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      case "safety": {
+        const incident = await this.prisma.safetyIncident.findUnique({ where: { id }, select: { workId: true } });
+        if (incident) return incident.workId;
+        return (await this.prisma.safetyInspection.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      }
+      case "assets":
+        return (await this.prisma.generalAsset.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      case "stakeholders":
+        return (await this.prisma.organizationStakeholderRole.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      case "payroll":
+        return (await this.prisma.payroll.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      case "per-diems":
+        return (await this.prisma.perDiem.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      case "lodging":
+        return (await this.prisma.lodging.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      case "concrete":
+        return (await this.prisma.concreteOrder.findUnique({ where: { id }, select: { workId: true } }))?.workId ?? null;
+      default:
+        return (
+          await this.prisma.genericRecord.findFirst({
+            where: { id, module, deletedAt: null },
+            select: { workId: true },
+          })
+        )?.workId ?? null;
+    }
   }
+
 }
