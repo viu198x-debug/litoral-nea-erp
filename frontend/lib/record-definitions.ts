@@ -190,6 +190,39 @@ export const recordDefinitions: Record<string, ModuleRecordDefinition> = {
     ["completedAt", "Fecha de finalización", "date"], ["parts", "Repuestos", "textarea"], ["partsCost", "Costo repuestos", "currency"],
     ["laborCost", "Costo mano de obra", "currency"], ["totalCost", "Costo total", "currency", true], ["nextServiceAt", "Próximo mantenimiento", "date"]
   )},
+  mechanics: { codePrefix: "MEC", titleLabel: "Mecánico", fields: fields(
+    ["employeeNumber", "Legajo / identificación", "text"], ["fullName", "Nombre completo", "text", true],
+    ["specialty", "Especialidad", "text"], ["phone", "Teléfono", "text"], ["email", "Correo", "email"],
+    ["internalExternal", "Tipo", "select", true, ["Interno", "Externo"]], ["active", "Activo", "select", true, yesNo],
+    ["notes", "Observaciones", "textarea"]
+  )},
+  "spare-parts": { codePrefix: "REP", titleLabel: "Repuesto", amountField: "stockValue", fields: fields(
+    ["sku", "Código / SKU", "text", true], ["description", "Descripción", "text", true], ["brand", "Marca", "text"],
+    ["unit", "Unidad", "text", true], ["currentStock", "Stock actual", "number", true], ["minimumStock", "Stock mínimo", "number"],
+    ["averageCost", "Costo promedio", "currency"], ["stockValue", "Stock valorizado", "currency"], ["location", "Ubicación", "text"],
+    ["active", "Activo", "select", true, yesNo]
+  )},
+  "fuel-estimates": { codePrefix: "ECO", titleLabel: "Estimación de combustible", requiresWork: true, amountField: "estimatedLiters", fields: fields(
+    ["vehicle", "Vehículo / dominio", "text", true], ["period", "Período", "text", true], ["estimatedKm", "Km previstos", "number"],
+    ["estimatedHours", "Horas previstas", "number"], ["estimatedLiters", "Litros estimados", "number", true],
+    ["basis", "Criterio de estimación", "textarea", true], ["approvedBy", "Aprobado por", "text"], ["actualLiters", "Litros reales", "number"],
+    ["deviationPct", "Desvío %", "number"]
+  )},
+  insurance: { codePrefix: "POL", titleLabel: "Póliza / caución", requiresWork: false, amountField: "premiumAmount", fields: fields(
+    ["policyNumber", "Número de póliza", "text", true], ["policyType", "Tipo", "select", true, ["Automotor", "Responsabilidad civil", "Accidentes personales", "Todo riesgo construcción", "Caución de contrato", "Caución de anticipo", "Caución de fondo de reparo", "Otra"]],
+    ["insurer", "Compañía emisora", "text", true], ["clientOrPrincipal", "Comitente / beneficiario", "text"], ["contractor", "Tomador / contratista", "text"],
+    ["asset", "Vehículo / máquina", "text"], ["issueDate", "Fecha de emisión", "date", true], ["startDate", "Vigencia desde", "date", true], ["endDate", "Vigencia hasta", "date", true],
+    ["premiumAmount", "Prima", "currency"], ["paidAmount", "Pagado", "currency"], ["coverageAmount", "Suma asegurada / caucionada", "currency"],
+    ["endorsementNumber", "Último endoso", "text"], ["renewalDate", "Próxima renovación", "date"], ["statusPolicy", "Estado", "select", true, ["Activa", "Pendiente", "Vencida", "Renovada", "Anulada", "Baja"]],
+    ["receipt", "Comprobante / recibo", "text"], ["actReference", "Acta / referencia", "text"], ["notes", "Observaciones", "textarea"]
+  )},
+  "unexpected-tasks": { codePrefix: "IMP", titleLabel: "Trabajo imprevisto", requiresWork: false, amountField: "actualCost", fields: fields(
+    ["priority", "Prioridad", "select", true, ["Baja", "Normal", "Alta", "Crítica"]], ["source", "Origen / solicitante", "text"],
+    ["assignedTo", "Asignado a", "text", true], ["location", "Ubicación", "text"], ["reportedAt", "Fecha de alta", "datetime-local", true],
+    ["dueAt", "Vencimiento", "datetime-local"], ["startedAt", "Inicio", "datetime-local"], ["completedAt", "Finalización", "datetime-local"],
+    ["vehicleOrMachine", "Vehículo / máquina afectada", "text"], ["estimatedCost", "Costo estimado", "currency"], ["actualCost", "Costo real", "currency"],
+    ["evidence", "Evidencias / actas / fotos", "textarea"], ["notes", "Observaciones", "textarea"]
+  )},
   hr: { codePrefix: "RRHH", titleLabel: "Empleado", amountField: "baseSalary", fields: fields(
     ["employeeNumber", "Legajo", "text", true], ["taxId", "CUIL", "tax-id", true], ["category", "Categoría", "text", true],
     ["position", "Puesto", "text", true], ["hireDate", "Fecha de ingreso", "date", true], ["attendance", "Asistencia / novedad", "textarea"],
