@@ -25,7 +25,7 @@ export class CsrfService {
     return {
       httpOnly,
       secure: this.secure,
-      sameSite: "strict",
+      sameSite: this.secure ? "none" : "lax",
       path: "/",
       priority: "high",
     };
