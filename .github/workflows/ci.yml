@@ -1,6 +1,6 @@
 name: ERP CI
 
-# Validates the deployable ERP main branch
+# Validates the deployable ERP main branch · business domain batch
 
 on:
   push:
