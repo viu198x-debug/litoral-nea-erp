@@ -103,6 +103,16 @@ export class AuthService {
             : {}),
         },
       });
+      if (attempts >= maxAttempts) {
+        await this.prisma.alert.create({
+          data: {
+            type: "SECURITY_ACCOUNT_LOCKOUT",
+            severity: "HIGH",
+            title: "Cuenta bloqueada por intentos fallidos",
+            description: `${user.email} · IP ${meta.ip ?? "desconocida"} · ${attempts} intentos`,
+          },
+        });
+      }
       await this.audit(AuditAction.LOGIN_FAILED, "auth", meta, user.id);
       throw new UnauthorizedException("Usuario o contraseña incorrectos");
     }
