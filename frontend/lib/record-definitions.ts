@@ -41,6 +41,21 @@ export const recordDefinitions: Record<string, ModuleRecordDefinition> = {
       ["responsibleName", "Responsable", "text", true], ["notes", "Observaciones", "textarea"]
     ),
   },
+  "technical-workspace": { codePrefix: "TEC", titleLabel: "Trabajo técnico", requiresWork: false, fields: fields(
+    ["discipline", "Disciplina", "select", true, ["Eléctrica", "Civil", "Arquitectura", "Mecánica", "Sanitaria", "Climatización", "Gases medicinales", "General"]],
+    ["taskType", "Tipo de tarea", "select", true, ["Relevamiento", "Cálculo", "Proyecto", "Plano", "Memoria", "Cómputo", "Inspección", "Informe", "Revisión", "Gestión técnica"]],
+    ["priority", "Prioridad", "select", true, ["Baja", "Normal", "Alta", "Crítica"]],
+    ["assignedTo", "Técnico asignado", "text", true], ["reviewer", "Revisor", "text"],
+    ["requestedAt", "Fecha de solicitud", "datetime-local", true], ["dueAt", "Vencimiento", "datetime-local"],
+    ["progressPct", "Avance %", "number"], ["estimatedHours", "Horas estimadas", "number"], ["actualHours", "Horas reales", "number"],
+    ["deliverable", "Entregable esperado", "textarea"], ["notes", "Observaciones", "textarea"]
+  )},
+  notifications: { codePrefix: "NOT", titleLabel: "Notificación", fields: fields(
+    ["notificationType", "Tipo", "select", true, ["Asignación", "Vencimiento", "Aprobación", "Alerta", "Documento", "Mantenimiento", "Seguridad", "Otro"]],
+    ["severity", "Severidad", "select", true, ["Info", "Advertencia", "Alta", "Crítica"]],
+    ["recipient", "Destinatario", "text", true], ["channel", "Canal", "select", true, ["In-app", "Email", "Push"]],
+    ["message", "Mensaje", "textarea", true], ["actionUrl", "Acción / vínculo", "text"], ["expiresAt", "Expira", "datetime-local"]
+  )},
   architecture: { codePrefix: "ARQ", titleLabel: "Proyecto / documento", requiresWork: true, fields: fields(
     ["projectType", "Tipo de proyecto", "select", true, ["Anteproyecto", "Proyecto ejecutivo", "Conforme a obra"]],
     ["discipline", "Disciplina", "select", true, ["Arquitectura", "Estructuras", "Instalaciones", "Cómputo"]],
@@ -228,6 +243,40 @@ export const recordDefinitions: Record<string, ModuleRecordDefinition> = {
     ["position", "Puesto", "text", true], ["hireDate", "Fecha de ingreso", "date", true], ["attendance", "Asistencia / novedad", "textarea"],
     ["hours", "Horas normales", "number"], ["overtime", "Horas extra", "number"], ["baseSalary", "Básico", "currency"],
     ["documentationDue", "Vencimiento documental", "date"], ["active", "Activo", "select", true, yesNo]
+  )},
+  "personnel-control": { codePrefix: "PER", titleLabel: "Movimiento de personal", requiresWork: false, fields: fields(
+    ["employee", "Empleado", "text", true], ["assignmentRole", "Función / rol", "text"], ["shift", "Turno", "text"],
+    ["attendanceType", "Novedad", "select", true, ["Presente", "Ausente", "Licencia", "Enfermedad", "Accidente", "Vacaciones", "Franco", "Comisión"]],
+    ["date", "Fecha", "date", true], ["checkIn", "Ingreso", "datetime-local"], ["checkOut", "Egreso", "datetime-local"],
+    ["normalHours", "Horas normales", "number"], ["overtimeHours", "Horas extra", "number"],
+    ["location", "Ubicación", "text"], ["source", "Origen", "select", true, ["Manual", "Móvil", "Importado"]],
+    ["observations", "Observaciones", "textarea"]
+  )},
+  safety: { codePrefix: "SEG", titleLabel: "Registro de Seguridad e Higiene", requiresWork: false, fields: fields(
+    ["recordType", "Tipo de registro", "select", true, ["Apto / credencial", "Entrega EPP", "Capacitación", "Incidente", "Inspección", "Acción correctiva"]],
+    ["employee", "Empleado", "text"], ["incidentType", "Tipo de incidente", "text"], ["severity", "Severidad", "select", false, ["Baja", "Media", "Alta", "Crítica"]],
+    ["issuedAt", "Emisión / entrega", "date"], ["expiresAt", "Vencimiento", "date"], ["occurredAt", "Fecha del evento", "datetime-local"],
+    ["location", "Ubicación", "text"], ["description", "Descripción / hallazgo", "textarea", true],
+    ["immediateAction", "Acción inmediata", "textarea"], ["correctiveAction", "Acción correctiva", "textarea"],
+    ["responsible", "Responsable", "text"], ["closedAt", "Cierre", "date"]
+  )},
+  assets: { codePrefix: "ACT", titleLabel: "Activo / bien", requiresWork: false, amountField: "currentValue", fields: fields(
+    ["assetType", "Tipo de activo", "select", true, ["Vehículo menor", "Herramienta", "Equipo", "Informática", "Mobiliario", "Instalación", "Instrumento", "Otro"]],
+    ["mobilityClass", "Clasificación", "select", true, ["Móvil", "No móvil"]],
+    ["description", "Descripción", "text", true], ["brand", "Marca", "text"], ["model", "Modelo", "text"], ["serialNumber", "Serie / identificación", "text"],
+    ["assignedTo", "Responsable asignado", "text"], ["location", "Ubicación", "text"],
+    ["purchaseDate", "Fecha de compra", "date"], ["acquisitionCost", "Costo de adquisición", "currency"], ["currentValue", "Valor actual", "currency"],
+    ["warrantyDue", "Vencimiento garantía", "date"], ["calibrationDue", "Calibración / verificación", "date"],
+    ["assetStatus", "Estado", "select", true, ["Activo", "En reparación", "Prestado", "Baja", "Perdido", "Vendido"]],
+    ["notes", "Observaciones", "textarea"]
+  )},
+  stakeholders: { codePrefix: "TER", titleLabel: "Razón social / dependencia", requiresWork: false, amountField: "accountBalance", fields: fields(
+    ["roleType", "Rol", "select", true, ["Comitente", "Contratista", "Subcontratista", "Proveedor", "Acreedor", "Aseguradora", "Organismo", "Municipio", "Ministerio", "Privado"]],
+    ["taxId", "CUIT", "tax-id"], ["vatCondition", "Condición fiscal", "text"], ["contactPerson", "Contacto", "text"],
+    ["email", "Correo", "email"], ["phone", "Teléfono", "text"], ["address", "Domicilio", "text"],
+    ["bankAccount", "CBU / Alias", "text"], ["paymentTerms", "Condición de pago", "text"],
+    ["accountBalance", "Saldo cuenta corriente", "currency"], ["creditLimit", "Límite de crédito", "currency"],
+    ["documentationDue", "Vencimiento documental", "date"], ["notes", "Observaciones", "textarea"]
   )},
   payroll: { codePrefix: "SUE", titleLabel: "Liquidación de sueldo", amountField: "companyCost", fields: fields(
     ["employee", "Empleado", "text", true], ["period", "Período", "text", true], ["baseAmount", "Básico", "currency", true],
