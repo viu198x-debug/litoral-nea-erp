@@ -112,3 +112,30 @@ test("los módulos, campos, permisos y workflows se configuran con auditoría", 
   assert.match(records, /validateConfiguredData/);
   assert.match(records, /Faltan campos obligatorios/);
 });
+
+
+test("los registros reales resuelven obra antes de autorizar operaciones por id", async () => {
+  const guard = await readFile(new URL("../src/auth/guards/permissions.guard.ts", import.meta.url), "utf8");
+  assert.match(guard, /resolveRecordWorkId/);
+  assert.match(guard, /case "certificates"/);
+  assert.match(guard, /case "fuel"/);
+  assert.match(guard, /case "insurance"/);
+  assert.match(guard, /case "personnel-control"/);
+  assert.match(guard, /case "assets"/);
+});
+
+test("la API deshabilita cache e indexación de respuestas sensibles", async () => {
+  const source = await readFile(new URL("../src/main.ts", import.meta.url), "utf8");
+  assert.match(source, /Cache-Control/);
+  assert.match(source, /no-store/);
+  assert.match(source, /X-Robots-Tag/);
+});
+
+test("altas manuales exigen contraseña robusta y los bloqueos generan alertas", async () => {
+  const dto = await readFile(new URL("../src/system/dto/create-manual-user.dto.ts", import.meta.url), "utf8");
+  const auth = await readFile(new URL("../src/auth/auth.service.ts", import.meta.url), "utf8");
+  assert.match(dto, /@Length\(12, 72\)/);
+  assert.match(dto, /mayúscula, minúscula, número y símbolo/);
+  assert.match(auth, /SECURITY_ACCOUNT_LOCKOUT/);
+  assert.match(auth, /Cuenta bloqueada por intentos fallidos/);
+});
