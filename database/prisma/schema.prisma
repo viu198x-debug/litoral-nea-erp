@@ -118,6 +118,7 @@ model User {
   directPermissions     UserPermission[]
   sessions              Session[]
   passwordResets        PasswordReset[]
+  assignedUnexpectedTasks UnexpectedTask[]
   workMemberships       WorkMember[]
   externalIdentities    ExternalIdentity[]
   reviewedRegistrations RegistrationRequest[] @relation("RegistrationReviewer")
@@ -352,7 +353,6 @@ model Work {
   journalLines       JournalLine[]
   fuelLogs           FuelLog[]
   maintenanceOrders  MaintenanceOrder[]
-  maintenancePlans   MaintenancePlan[]
   fuelEstimates      FuelEstimate[]
   insurancePolicies  InsurancePolicy[]
   unexpectedTasks    UnexpectedTask[]
@@ -997,6 +997,7 @@ model UnexpectedTask {
   createdById        String
   notes              String?
   work               Work?        @relation(fields: [workId], references: [id])
+  assignedUser       User?        @relation(fields: [assignedUserId], references: [id])
   assignedEmployee   Employee?    @relation(fields: [assignedEmployeeId], references: [id])
   vehicle            Vehicle?     @relation(fields: [vehicleId], references: [id])
   machine            Machine?     @relation(fields: [machineId], references: [id])
