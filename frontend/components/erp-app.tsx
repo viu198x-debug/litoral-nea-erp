@@ -2272,9 +2272,9 @@ function RecordEditDialog({
         .filter((field) => values[field.key] !== undefined && values[field.key] !== "")
         .map((field) => {
           const value = values[field.key];
-          return [["number", "currency"].includes(field.type) ? Number(value) : value, field.key];
-        })
-        .map(([value, key]) => [key, value]),
+          const normalized = ["number", "currency"].includes(field.type) ? Number(value) : value;
+          return [field.key, normalized] as const;
+        }),
     );
     setSaving(true);
     try {
