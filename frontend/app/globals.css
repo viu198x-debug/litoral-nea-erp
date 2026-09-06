@@ -4423,3 +4423,46 @@ a:focus-visible {
     justify-self: start;
   }
 }
+
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.table-action-link {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+  padding: 6px 8px;
+  color: #36515d;
+  font-size: 0.66rem;
+  font-weight: 750;
+}
+
+.table-action-link:hover {
+  border-color: #b8cfd6;
+  background: #f6fbfc;
+}
+
+.table-action-link.danger {
+  color: #a44242;
+}
+
+.table-action-link.danger:hover {
+  border-color: #e4bcbc;
+  background: #fff8f8;
+}
+
+@media (max-width: 720px) {
+  .row-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .table-action-link {
+    min-width: 72px;
+  }
+}
