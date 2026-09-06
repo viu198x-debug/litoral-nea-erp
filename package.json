@@ -2,8 +2,13 @@
   "name": "litoral-nea-erp",
   "version": "0.1.0",
   "private": true,
-  "workspaces": ["frontend", "backend"],
-  "engines": { "node": ">=22.13.0" },
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "engines": {
+    "node": ">=22.13.0 <23"
+  },
   "scripts": {
     "dev": "npm-run-all --parallel dev:frontend dev:backend",
     "dev:frontend": "npm --workspace frontend run dev",
