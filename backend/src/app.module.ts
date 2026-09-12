@@ -8,6 +8,7 @@ import { PermissionsGuard } from "./auth/guards/permissions.guard";
 import { AuditInterceptor } from "./common/audit.interceptor";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { DocumentsModule } from "./documents/documents.module";
+import { FleetControlModule } from "./fleet-control/fleet-control.module";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { RecordsModule } from "./records/records.module";
@@ -42,6 +43,7 @@ import { PayrollModule } from "./payroll/payroll.module";
     DocumentsModule,
     TreasuryModule,
     PayrollModule,
+    FleetControlModule,
     RecordsModule,
     SystemModule,
     ApprovalsModule,
