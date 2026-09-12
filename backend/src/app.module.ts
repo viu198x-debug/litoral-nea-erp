@@ -19,6 +19,7 @@ import { CsrfGuard } from "./security/csrf.guard";
 import { SecurityModule } from "./security/security.module";
 import { WorkspaceModule } from "./workspace/workspace.module";
 import { TreasuryModule } from "./treasury/treasury.module";
+import { PayrollModule } from "./payroll/payroll.module";
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { TreasuryModule } from "./treasury/treasury.module";
     WorksModule,
     DocumentsModule,
     TreasuryModule,
+    PayrollModule,
     RecordsModule,
     SystemModule,
     ApprovalsModule,
