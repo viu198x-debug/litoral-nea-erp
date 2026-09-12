@@ -11,6 +11,7 @@ import { DocumentsModule } from "./documents/documents.module";
 import { FleetControlModule } from "./fleet-control/fleet-control.module";
 import { HealthModule } from "./health/health.module";
 import { PrismaModule } from "./prisma/prisma.module";
+import { ProcurementModule } from "./procurement/procurement.module";
 import { RecordsModule } from "./records/records.module";
 import { SystemModule } from "./system/system.module";
 import { WorksModule } from "./works/works.module";
@@ -44,6 +45,7 @@ import { PayrollModule } from "./payroll/payroll.module";
     TreasuryModule,
     PayrollModule,
     FleetControlModule,
+    ProcurementModule,
     RecordsModule,
     SystemModule,
     ApprovalsModule,
