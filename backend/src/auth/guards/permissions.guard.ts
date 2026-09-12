@@ -98,6 +98,13 @@ export class PermissionsGuard implements CanActivate {
     }
 
     if (user.roleCodes.includes("ADMIN_GENERAL")) return true;
+    if (
+      user.roleCodes.includes("GERENTE_EMPRESA") &&
+      module === "system" &&
+      required.action === "admin"
+    ) {
+      return true;
+    }
 
     const direct = await this.prisma.userPermission.findFirst({
       where: {
@@ -138,7 +145,9 @@ export class PermissionsGuard implements CanActivate {
       );
     }
     return true;
-  }  private async resolveRecordWorkId(module: string, id: string): Promise<string | null> {
+  }
+
+  private async resolveRecordWorkId(module: string, id: string): Promise<string | null> {
     switch (module) {
       case "budgets":
         return (await this.prisma.budget.findFirst({ where: { id, deletedAt: null }, select: { workId: true } }))?.workId ?? null;
@@ -198,5 +207,4 @@ export class PermissionsGuard implements CanActivate {
         )?.workId ?? null;
     }
   }
-
 }
