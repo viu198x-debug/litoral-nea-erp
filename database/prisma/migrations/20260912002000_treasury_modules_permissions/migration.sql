@@ -11,9 +11,13 @@ ON CONFLICT ("slug") DO UPDATE SET
   "updatedAt" = NOW();
 
 INSERT INTO "Permission" ("id", "module", "action", "description")
-SELECT 'perm_' || replace(m.module, '-', '_') || '_' || a.action, m.module, a.action, 'Tesorería'
-FROM (VALUES ('treasury'), ('treasury-accounts')) AS m(module)
-CROSS JOIN (VALUES ('view'), ('create'), ('modify'), ('approve'), ('void'), ('download'), ('export'), ('admin')) AS a(action)
+SELECT 'perm_treasury_' || a.action, 'treasury', a.action, 'Tesorería'
+FROM (VALUES ('view'), ('download'), ('export'), ('admin')) AS a(action)
+ON CONFLICT ("module", "action") DO NOTHING;
+
+INSERT INTO "Permission" ("id", "module", "action", "description")
+SELECT 'perm_treasury_accounts_' || a.action, 'treasury-accounts', a.action, 'Tesorería'
+FROM (VALUES ('view'), ('create'), ('modify'), ('approve'), ('void'), ('download'), ('export'), ('admin')) AS a(action)
 ON CONFLICT ("module", "action") DO NOTHING;
 
 INSERT INTO "RolePermission" ("roleId", "permissionId", "allowed")
