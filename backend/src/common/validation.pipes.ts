@@ -16,6 +16,8 @@ export const ERP_MODULES = new Set([
   "suppliers",
   "logistics",
   "stock",
+  "treasury",
+  "treasury-accounts",
   "cash",
   "banks",
   "payments",
