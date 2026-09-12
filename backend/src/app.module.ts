@@ -39,11 +39,11 @@ import { TreasuryModule } from "./treasury/treasury.module";
     DashboardModule,
     WorksModule,
     DocumentsModule,
+    TreasuryModule,
     RecordsModule,
     SystemModule,
     ApprovalsModule,
     WorkspaceModule,
-    TreasuryModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
