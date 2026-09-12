@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { RecordStatus } from "@prisma/client";
 import { RequirePermission } from "../common/permissions.decorator";
 import { EntityIdPipe } from "../common/validation.pipes";
@@ -37,6 +37,22 @@ export class TreasuryRecordsController {
         difference: row.difference,
       },
     }));
+  }
+
+  @Post()
+  @RequirePermission("treasury-accounts", "create")
+  create(@Body() dto: CreateRecordDto) {
+    const data = dto.data ?? {};
+    return this.treasury.createAccount({
+      type: String(data.accountType ?? "Cuenta bancaria").toLowerCase().includes("billetera") ? "WALLET" : "BANK",
+      institution: String(data.institution ?? dto.title),
+      accountName: String(data.accountName ?? dto.title),
+      accountNumber: String(data.accountNumber ?? dto.code),
+      cbuOrCvu: data.cbuOrCvu === undefined ? undefined : String(data.cbuOrCvu),
+      alias: data.alias === undefined ? undefined : String(data.alias),
+      currency: data.currency === undefined ? "ARS" : String(data.currency),
+      openingBalance: data.openingBalance === undefined ? 0 : Number(data.openingBalance),
+    });
   }
 
   @Get(":id")
