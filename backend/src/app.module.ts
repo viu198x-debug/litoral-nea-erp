@@ -18,6 +18,7 @@ import { validateEnvironment } from "./config/environment";
 import { CsrfGuard } from "./security/csrf.guard";
 import { SecurityModule } from "./security/security.module";
 import { WorkspaceModule } from "./workspace/workspace.module";
+import { TreasuryModule } from "./treasury/treasury.module";
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { WorkspaceModule } from "./workspace/workspace.module";
     SystemModule,
     ApprovalsModule,
     WorkspaceModule,
+    TreasuryModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
