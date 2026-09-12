@@ -10,8 +10,8 @@ import { DashboardModule } from "./dashboard/dashboard.module";
 import { DocumentsModule } from "./documents/documents.module";
 import { FleetControlModule } from "./fleet-control/fleet-control.module";
 import { HealthModule } from "./health/health.module";
+import { IdentityAdminModule } from "./identity-admin/identity-admin.module";
 import { PrismaModule } from "./prisma/prisma.module";
-import { ProcurementModule } from "./procurement/procurement.module";
 import { RecordsModule } from "./records/records.module";
 import { SystemModule } from "./system/system.module";
 import { WorksModule } from "./works/works.module";
@@ -22,6 +22,7 @@ import { SecurityModule } from "./security/security.module";
 import { WorkspaceModule } from "./workspace/workspace.module";
 import { TreasuryModule } from "./treasury/treasury.module";
 import { PayrollModule } from "./payroll/payroll.module";
+import { ProcurementModule } from "./procurement/procurement.module";
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { PayrollModule } from "./payroll/payroll.module";
     PayrollModule,
     FleetControlModule,
     ProcurementModule,
+    IdentityAdminModule,
     RecordsModule,
     SystemModule,
     ApprovalsModule,
