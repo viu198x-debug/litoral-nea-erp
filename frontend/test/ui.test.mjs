@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-test("la navegación expone los 33 módulos definidos", async () => {
+test("la navegación expone los 45 módulos definidos", async () => {
   const source = await readFile(new URL("../lib/modules.ts", import.meta.url), "utf8");
   const entries = source.match(/slug: "/g) ?? [];
-  assert.equal(entries.length, 33);
+  assert.equal(entries.length, 45);
 });
 
 test("el frontend conserva las ocho obras demo", async () => {
@@ -69,9 +69,9 @@ test("la navegación de escritorio ocupa la primera columna con ancho fijo", asy
   assert.match(source, /<Toaster richColors position="top-right" \/>\s*<div className="erp-app">\s*<aside className="desktop-sidebar">/);
 });
 
-test("los 29 módulos registrables tienen formularios con datos característicos", async () => {
+test("los 41 módulos registrables tienen formularios con datos característicos", async () => {
   const source = await readFile(new URL("../lib/record-definitions.ts", import.meta.url), "utf8");
-  assert.equal((source.match(/codePrefix:/g) ?? []).length - 1, 29);
+  assert.equal((source.match(/codePrefix:/g) ?? []).length - 1, 41);
   for (const characteristic of [
     "Monto contractual", "Número de plano", "Curva S", "Fondo de reparo",
     "CUIT", "Stock mínimo", "Conciliado", "Débito fiscal", "RTO / VTV",
@@ -79,9 +79,22 @@ test("los 29 módulos registrables tienen formularios con datos característicos
   ]) assert.match(source, new RegExp(characteristic.replace("/", "\\/")));
 });
 
+test("Tesorería integra bancos, ahorros, billeteras, efectivo, cheques y controles", async () => {
+  const source = await readFile(new URL("../components/treasury-page.tsx", import.meta.url), "utf8");
+  const modules = await readFile(new URL("../lib/modules.ts", import.meta.url), "utf8");
+  const users = await readFile(new URL("../lib/demo-users.ts", import.meta.url), "utf8");
+  for (const capability of [
+    "Cuentas corrientes", "Cajas de ahorro", "Billeteras virtuales", "Efectivo",
+    "Registrar cheque", "Conciliación bancaria", "Arqueo de caja", "Cierre diario",
+  ]) assert.match(source, new RegExp(capability));
+  assert.match(modules, /slug: "treasury"/);
+  assert.match(users, /ADM_COMPRAS_TESORERIA[\s\S]*?"treasury"/);
+  assert.match(source, /Quien registra no aprueba su propio movimiento/);
+});
+
 test("el configurador convierte módulos dinámicos en formularios operativos", async () => {
   const source = await readFile(new URL("../components/erp-app.tsx", import.meta.url), "utf8");
-  assert.match(source, /recordDefinition: \{/);
+  assert.match(source, /recordDefinition: module\.fields/);
   assert.match(source, /module\.recordDefinition \?\?/);
   assert.match(source, /updateField/);
   assert.match(source, /function WorkflowConfiguratorPanel/);

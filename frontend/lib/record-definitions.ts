@@ -142,6 +142,15 @@ export const recordDefinitions: Record<string, ModuleRecordDefinition> = {
     ["currentStock", "Existencia resultante", "number"], ["minimumStock", "Stock mínimo", "number"],
     ["unitCost", "Costo unitario", "currency"], ["totalCost", "Costo total", "currency"], ["reference", "Referencia / remito", "text"]
   )},
+  treasury: { codePrefix: "TES", titleLabel: "Operación de tesorería", amountField: "amount", fields: fields(
+    ["operationType", "Tipo de operación", "select", true, ["Ingreso", "Egreso", "Transferencia", "Depósito", "Extracción", "Comisión", "Interés", "Cheque emitido", "Cheque recibido", "Ajuste"]],
+    ["sourceAccount", "Cuenta de origen", "text"], ["destinationAccount", "Cuenta de destino", "text"],
+    ["paymentMethod", "Medio", "select", true, ["Transferencia", "Cheque", "Efectivo", "Billetera virtual", "Débito automático"]],
+    ["counterparty", "Contraparte", "text"], ["concept", "Concepto", "textarea", true],
+    ["amount", "Importe", "currency", true], ["currency", "Moneda", "select", true, ["ARS", "USD"]],
+    ["valueDate", "Fecha valor", "date", true], ["reference", "Referencia / comprobante", "text"],
+    ["costCenter", "Centro de costo", "text"], ["requiresApproval", "Requiere aprobación", "select", true, yesNo]
+  )},
   cash: { codePrefix: "CAJ", titleLabel: "Movimiento de caja", amountField: "amount", fields: fields(
     ["cashBox", "Caja", "select", true, ["Central", "Administrativa", "Caja de obra"]], ["direction", "Tipo", "select", true, ["Ingreso", "Egreso", "Entrega", "Rendición"]],
     ["beneficiary", "Responsable / beneficiario", "text", true], ["concept", "Concepto", "textarea", true],

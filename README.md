@@ -61,7 +61,8 @@ Servicios por defecto:
 
 ## Alcance implementado
 
-- Navegación completa de los 33 módulos solicitados y dashboard por obra.
+- Navegación completa de 45 módulos operativos y dashboard por obra.
+- Tesorería central con cuentas corrientes, cajas de ahorro, billeteras virtuales, efectivo, cheques, conciliaciones, arqueos, cierre diario y aprobación segregada.
 - Ocho obras demo con información física, financiera y documental.
 - API especializada para autenticación, dashboard, obras, documentos, sistema
   y aprobaciones.

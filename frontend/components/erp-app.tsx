@@ -88,6 +88,7 @@ import {
 } from "@/components/ui/table";
 import { activity, alerts, cashflow, works } from "@frontend/lib/demo-data";
 import { demoAccounts, findDemoAccount } from "@frontend/lib/demo-users";
+import { TreasuryPage } from "./treasury-page";
 import { groups, modules } from "@frontend/lib/modules";
 import {
   fallbackRecordDefinition,
@@ -119,6 +120,7 @@ const iconMap: Record<string, LucideIcon> = {
   ContactRound,
   Route,
   Boxes,
+  CircleDollarSign,
   WalletCards,
   ArrowLeftRight: ArrowRight,
   BookOpenCheck,
@@ -492,7 +494,7 @@ export function ErpApp() {
   const availableWorks = user.assignedWorks.length
     ? runtimeWorks.filter((work) => user.assignedWorks.includes(work.code))
     : runtimeWorks;
-  const mayCreate = !["dashboard", "management", "approvals", "system"].includes(activeModule.slug)
+  const mayCreate = !["dashboard", "management", "approvals", "system", "treasury"].includes(activeModule.slug)
     && canCreateInModule(user, activeModule.slug);
 
   return (
@@ -590,6 +592,13 @@ export function ErpApp() {
               onOpenWork={openWork}
               onCreate={mayCreate ? () => setCreateOpen(true) : undefined}
               search={globalSearch}
+              workItems={availableWorks}
+            />
+          ) : activeSlug === "treasury" ? (
+            <TreasuryPage
+              request={apiFetch}
+              demoMode={demoMode}
+              user={user}
               workItems={availableWorks}
             />
           ) : (

@@ -7,6 +7,11 @@ import {
   OrganizationType,
   PrismaClient,
   RecordStatus,
+  TreasuryAccountType,
+  TreasuryChequeKind,
+  TreasuryChequeStatus,
+  TreasuryMovementStatus,
+  TreasuryMovementType,
   UserStatus,
   WorkStatus,
 } from "@prisma/client";
@@ -32,6 +37,7 @@ const modules = [
   "suppliers",
   "logistics",
   "stock",
+  "treasury",
   "cash",
   "banks",
   "payments",
@@ -349,8 +355,8 @@ async function main() {
     where: { roleId: { in: Object.values(roles).map((role) => role.id) } },
   });
   const roleRules = [
-    { roleId: roles.purchasing.id, modules: ["dashboard", "works", "documents", "purchases", "suppliers", "logistics", "stock", "cash", "banks", "payments", "dossiers", "per-diems", "lodging"], createModules: ["documents", "purchases", "suppliers", "logistics", "stock", "cash", "banks", "payments", "dossiers", "per-diems", "lodging"], actions: ["view", "create", "modify", "download", "export"] },
-    { roleId: roles.accounting.id, modules: ["dashboard", "works", "documents", "budgets", "public-works", "certificates", "dossiers", "payments", "accounting", "taxes", "banks"], createModules: ["documents", "budgets", "public-works", "certificates", "dossiers", "payments", "accounting", "taxes", "banks"], actions: ["view", "create", "modify", "download", "export"] },
+    { roleId: roles.purchasing.id, modules: ["dashboard", "works", "documents", "purchases", "suppliers", "logistics", "stock", "treasury", "cash", "banks", "payments", "dossiers", "per-diems", "lodging"], createModules: ["documents", "purchases", "suppliers", "logistics", "stock", "treasury", "cash", "banks", "payments", "dossiers", "per-diems", "lodging"], actions: ["view", "create", "modify", "approve", "download", "export"] },
+    { roleId: roles.accounting.id, modules: ["dashboard", "works", "documents", "budgets", "public-works", "certificates", "dossiers", "treasury", "payments", "accounting", "taxes", "banks"], createModules: ["documents", "budgets", "public-works", "certificates", "dossiers", "treasury", "payments", "accounting", "taxes", "banks"], actions: ["view", "create", "modify", "download", "export"] },
     { roleId: roles.people.id, modules: ["dashboard", "works", "documents", "dossiers", "hr", "payroll", "per-diems", "lodging", "drivers", "maintenance"], createModules: ["documents", "dossiers", "hr", "payroll", "per-diems", "lodging", "drivers", "maintenance"], actions: ["view", "create", "modify", "download", "export"] },
     { roleId: roles.siteLead.id, modules: ["dashboard", "works", "documents", "planning", "progress", "public-works", "certificates", "dossiers", "purchases", "logistics", "stock", "fleet", "fuel", "machinery"], createModules: ["documents", "progress", "certificates", "dossiers", "purchases", "logistics", "stock", "fuel"], actions: ["view", "create", "modify", "download"] },
     { roleId: roles.technicalOffice.id, modules: ["dashboard", "works", "documents", "architecture", "engineering", "budgets", "planning", "progress", "public-works", "certificates"], createModules: ["documents", "architecture", "engineering", "budgets", "planning", "progress", "public-works", "certificates"], actions: ["view", "create", "modify", "download"] },
@@ -727,6 +733,54 @@ function demoFieldValue(
     });
   }
 
+  const treasuryAccounts = await Promise.all([
+    prisma.treasuryAccount.upsert({
+      where: { companyId_code: { companyId: company.id, code: "BCO-CTES-CC" } },
+      update: {},
+      create: { companyId: company.id, code: "BCO-CTES-CC", name: "Cuenta corriente principal", type: TreasuryAccountType.BANK_CURRENT, institution: "Banco de Corrientes", accountNumber: "001-000184/7", cbu: "0940000000000000018470", alias: "LITORAL.CORRIENTES", holderName: "LITORAL NEA SRL", holderTaxId: company.taxId, balance: 108_000_000, availableBalance: 120_000_000, overdraftLimit: 12_000_000, treasurerId: users[1].id },
+    }),
+    prisma.treasuryAccount.upsert({
+      where: { companyId_code: { companyId: company.id, code: "BNA-CA-ARS" } },
+      update: {},
+      create: { companyId: company.id, code: "BNA-CA-ARS", name: "Caja de ahorro operativa", type: TreasuryAccountType.BANK_SAVINGS, institution: "Banco Nación", accountNumber: "45800912", cbu: "0110000000004580091201", alias: "LITORAL.NACION", holderName: "LITORAL NEA SRL", holderTaxId: company.taxId, balance: 36_500_000, availableBalance: 36_500_000, treasurerId: users[1].id },
+    }),
+    prisma.treasuryAccount.upsert({
+      where: { companyId_code: { companyId: company.id, code: "MP-CORP" } },
+      update: {},
+      create: { companyId: company.id, code: "MP-CORP", name: "Billetera corporativa", type: TreasuryAccountType.VIRTUAL_WALLET, institution: "Mercado Pago", accountNumber: "CVU-DEMO-001", alias: "LITORALNEA.MP", holderName: "LITORAL NEA SRL", holderTaxId: company.taxId, balance: 8_750_000, availableBalance: 8_750_000, treasurerId: users[1].id },
+    }),
+    prisma.treasuryAccount.upsert({
+      where: { companyId_code: { companyId: company.id, code: "EF-CENTRAL" } },
+      update: {},
+      create: { companyId: company.id, code: "EF-CENTRAL", name: "Efectivo · Caja central", type: TreasuryAccountType.CASH, institution: "Tesorería central", balance: 12_000_000, availableBalance: 12_000_000, treasurerId: users[1].id },
+    }),
+    prisma.treasuryAccount.upsert({
+      where: { companyId_code: { companyId: company.id, code: "EF-ADM" } },
+      update: {},
+      create: { companyId: company.id, code: "EF-ADM", name: "Efectivo · Caja administrativa", type: TreasuryAccountType.CASH, institution: "Administración", balance: 4_000_000, availableBalance: 4_000_000, treasurerId: users[1].id },
+    }),
+  ]);
+
+  const [currentAccount, savingsAccount, walletAccount, centralTreasuryCash] = treasuryAccounts;
+  if ((await prisma.treasuryCheque.count({ where: { companyId: company.id } })) === 0) {
+    await prisma.treasuryCheque.createMany({
+      data: [
+        { companyId: company.id, accountId: currentAccount.id, workId: works[4].id, kind: TreasuryChequeKind.OWN, status: TreasuryChequeStatus.ISSUED, number: "00018451", bankName: "Banco de Corrientes", accountNumber: currentAccount.accountNumber, issuerName: "LITORAL NEA SRL", beneficiary: "Proveedor Demo de Materiales SRL", amount: 6_850_000, issueDate: new Date("2026-09-18"), dueDate: new Date("2026-09-30"), createdById: users[1].id },
+        { companyId: company.id, accountId: savingsAccount.id, workId: works[0].id, kind: TreasuryChequeKind.THIRD_PARTY, status: TreasuryChequeStatus.PORTFOLIO, number: "75810329", bankName: "Banco Macro", issuerName: "Comitente Demo", issuerTaxId: "30-71000001-1", beneficiary: "LITORAL NEA SRL", amount: 12_400_000, issueDate: new Date("2026-09-20"), dueDate: new Date("2026-10-05"), receivedAt: new Date("2026-09-22"), createdById: users[1].id },
+        { companyId: company.id, accountId: currentAccount.id, workId: works[2].id, kind: TreasuryChequeKind.THIRD_PARTY, status: TreasuryChequeStatus.DEPOSITED, number: "91002614", bankName: "Banco Galicia", issuerName: "Municipalidad Demo", beneficiary: "LITORAL NEA SRL", amount: 8_200_000, issueDate: new Date("2026-09-10"), dueDate: new Date("2026-09-24"), receivedAt: new Date("2026-09-12"), depositedAt: new Date("2026-09-23"), createdById: users[1].id },
+      ],
+    });
+  }
+  if ((await prisma.treasuryMovement.count({ where: { companyId: company.id } })) === 0) {
+    await prisma.treasuryMovement.createMany({
+      data: [
+        { companyId: company.id, workId: works[0].id, destinationAccountId: currentAccount.id, type: TreasuryMovementType.INCOME, status: TreasuryMovementStatus.EXECUTED, concept: "Cobro certificado Nº 4", amount: 18_500_000, counterparty: "SENASA", paymentMethod: "Transferencia", reference: "OP-2026-441", createdById: users[1].id, approvedById: admin.id, approvedAt: new Date("2026-09-24T10:00:00Z"), occurredAt: new Date("2026-09-24T10:00:00Z") },
+        { companyId: company.id, workId: works[4].id, sourceAccountId: currentAccount.id, type: TreasuryMovementType.EXPENSE, status: TreasuryMovementStatus.EXECUTED, concept: "Pago parcial orden de compra OC-2026-0048", amount: 6_500_000, counterparty: "Proveedor Demo de Materiales SRL", paymentMethod: "Transferencia", reference: "TR-8841", createdById: users[1].id, approvedById: admin.id, approvedAt: new Date("2026-09-24T11:00:00Z"), occurredAt: new Date("2026-09-24T11:00:00Z") },
+        { companyId: company.id, sourceAccountId: walletAccount.id, destinationAccountId: centralTreasuryCash.id, type: TreasuryMovementType.TRANSFER, status: TreasuryMovementStatus.PENDING, concept: "Reposición de caja central", amount: 900_000, paymentMethod: "Billetera virtual", reference: "TES-PEND-001", createdById: users[1].id, occurredAt: new Date("2026-09-24T12:00:00Z") },
+      ],
+    });
+  }
+
   for (const estimate of [
     { taxType: "IVA", period: "2026-09", debit: 28_300_000, credit: 12_900_000, due: 13_700_000 },
     { taxType: "IIBB DGR Corrientes", period: "2026-09", debit: 8_100_000, credit: 0, due: 7_600_000 },
@@ -877,6 +931,7 @@ function demoFieldValue(
   for (const definition of [
     { code: "WF-COMPRAS-01", module: "purchases", name: "Aprobación de compras" },
     { code: "WF-PAGOS-01", module: "payments", name: "Aprobación de pagos" },
+    { code: "WF-TESORERIA-01", module: "treasury", name: "Aprobación de movimientos de tesorería" },
     { code: "WF-VIATICOS-01", module: "per-diems", name: "Aprobación de viáticos" },
     { code: "WF-PRESUP-01", module: "budgets", name: "Aprobación de presupuestos" },
     { code: "WF-CERT-01", module: "certificates", name: "Aprobación de certificados" },
@@ -892,7 +947,7 @@ function demoFieldValue(
         steps: [
           {
             role:
-              definition.module === "purchases" || definition.module === "payments"
+              definition.module === "purchases" || definition.module === "payments" || definition.module === "treasury"
                 ? "ADM_COMPRAS_TESORERIA"
                 : definition.module === "per-diems" || definition.module === "payroll"
                   ? "ADM_RRHH_DOCUMENTAL"

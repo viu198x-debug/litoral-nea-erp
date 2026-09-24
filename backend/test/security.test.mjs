@@ -113,6 +113,23 @@ test("los módulos, campos, permisos y workflows se configuran con auditoría", 
   assert.match(records, /Faltan campos obligatorios/);
 });
 
+test("Tesorería exige RBAC, aprobación separada, saldos transaccionales y conciliación", async () => {
+  const controller = await readFile(new URL("../src/treasury/treasury-control.controller.ts", import.meta.url), "utf8");
+  const service = await readFile(new URL("../src/treasury/treasury-control.service.ts", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../../database/prisma/migrations/20260924130000_treasury_control/migration.sql", import.meta.url), "utf8");
+  assert.match(controller, /@RequirePermission\("treasury", "approve"\)/);
+  assert.match(controller, /@Post\("cash-counts"\)/);
+  assert.match(controller, /@Post\("daily-closes"\)/);
+  assert.match(service, /Quien registra el movimiento no puede aprobarlo/);
+  assert.match(service, /TransactionIsolationLevel\.Serializable/);
+  assert.match(service, /Saldo y descubierto insuficientes/);
+  assert.match(service, /TreasuryMovementStatus\.RECONCILED/);
+  assert.match(service, /Transición de/);
+  assert.match(migration, /CREATE TABLE "TreasuryAccount"/);
+  assert.match(migration, /CREATE TABLE "TreasuryCheque"/);
+  assert.match(migration, /CREATE TABLE "TreasuryCashCount"/);
+});
+
 
 test("los registros reales resuelven obra antes de autorizar operaciones por id", async () => {
   const guard = await readFile(new URL("../src/auth/guards/permissions.guard.ts", import.meta.url), "utf8");

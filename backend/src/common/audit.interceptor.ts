@@ -17,6 +17,13 @@ const actionByMethod: Record<string, AuditAction | undefined> = {
   DELETE: AuditAction.SOFT_DELETE,
 };
 
+const actionsWithSnapshot = new Set<AuditAction>([
+  AuditAction.UPDATE,
+  AuditAction.SOFT_DELETE,
+  AuditAction.APPROVE,
+  AuditAction.VOID,
+]);
+
 const secretKeys = new Set([
   "password",
   "newpassword",
@@ -68,16 +75,20 @@ export class AuditInterceptor implements NestInterceptor {
     const request = context
       .switchToHttp()
       .getRequest<Request & { user?: AuthUser; requestId?: string }>();
-    const action = actionByMethod[request.method];
     const parts = request.path.split("/").filter(Boolean);
+    const action = parts.includes("approve")
+      ? AuditAction.APPROVE
+      : parts.includes("void")
+        ? AuditAction.VOID
+        : actionByMethod[request.method];
     const root = parts.find((part) =>
-      ["auth", "dashboard", "works", "documents", "records", "system", "approvals", "health"].includes(part),
+      ["auth", "dashboard", "works", "documents", "records", "treasury", "system", "approvals", "health"].includes(part),
     );
     const params = request.params as Record<string, string> | undefined;
     const module = root === "records" ? params?.module ?? "records" : root ?? "system";
     const before =
-      action === AuditAction.UPDATE || action === AuditAction.SOFT_DELETE
-        ? await this.snapshot(root, params?.id, module, request.user)
+      action && actionsWithSnapshot.has(action)
+        ? await this.snapshot(root, params?.id, module, request.user, parts)
         : undefined;
 
     return next.handle().pipe(
@@ -113,6 +124,7 @@ export class AuditInterceptor implements NestInterceptor {
     id: string | undefined,
     module: string,
     user: AuthUser | undefined,
+    parts: string[],
   ) {
     if (!id || !user) return undefined;
     let value: unknown;
@@ -150,6 +162,20 @@ export class AuditInterceptor implements NestInterceptor {
           mfaEnabled: true,
         },
       });
+    } else if (root === "treasury") {
+      if (parts.includes("accounts")) {
+        value = await this.prisma.treasuryAccount.findFirst({
+          where: { id, companyId: user.companyId, deletedAt: null },
+        });
+      } else if (parts.includes("movements")) {
+        value = await this.prisma.treasuryMovement.findFirst({
+          where: { id, companyId: user.companyId, deletedAt: null },
+        });
+      } else if (parts.includes("cheques")) {
+        value = await this.prisma.treasuryCheque.findFirst({
+          where: { id, companyId: user.companyId, deletedAt: null },
+        });
+      }
     }
     return sanitizedBody(value);
   }

@@ -18,7 +18,7 @@ reportadas por npm en el árbol instalado.
 | Compilación | NestJS y Next.js 16.3.4: compilación productiva correcta. |
 | Prisma | `validate`, `generate` y `migrate diff --from-empty`: correctos. |
 | Dependencias | `npm audit`: 0 vulnerabilidades conocidas, incluidas devDependencies. |
-| Demo | 33 módulos navegables, 8 obras y 7 usuarios definidos. |
+| Demo | 45 módulos navegables, 8 obras y 7 usuarios definidos. |
 | HTTP estático | Portada, bundles, logo e imagen principal respondieron HTTP 200. |
 | Paquete Sites | Archivo de despliegue validado con `dist/index.html` y metadatos del proyecto. |
 | Docker Compose | Desarrollo y producción: YAML válido; cinco servicios, healthchecks, PostgreSQL privado y HTTPS automático. |
@@ -35,7 +35,7 @@ reportadas por npm en el árbol instalado.
 - Google y Microsoft/Hotmail mediante OIDC + PKCE, con alta pendiente y bandeja
   de aprobación exclusiva de Administración.
 - Dashboard general, listado y dashboard de ocho obras.
-- Los 33 módulos, creación modular, búsqueda, actualización de tabla y API REST.
+- Los 45 módulos, creación modular, Tesorería, búsqueda, actualización de tabla y API REST.
 - Formularios característicos para los 29 módulos registrables, con campos
   obligatorios, tipos, obra/centro de costo, adjuntos y validación de servidor.
 - Configurador auditable de módulos, campos, permisos por rol y ocho workflows.

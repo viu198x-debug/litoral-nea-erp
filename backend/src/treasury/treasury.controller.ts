@@ -11,7 +11,7 @@ import {
 } from "./treasury.dto";
 import { TreasuryService } from "./treasury.service";
 
-@Controller("treasury")
+@Controller("treasury/legacy")
 export class TreasuryController {
   constructor(private readonly treasury: TreasuryService) {}
 

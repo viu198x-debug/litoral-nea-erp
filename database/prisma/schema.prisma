@@ -69,6 +69,66 @@ enum MovementDirection {
   OUT
 }
 
+enum TreasuryAccountType {
+  BANK_CURRENT
+  BANK_SAVINGS
+  VIRTUAL_WALLET
+  CASH
+}
+
+enum TreasuryMovementType {
+  INCOME
+  EXPENSE
+  TRANSFER
+  DEPOSIT
+  WITHDRAWAL
+  FEE
+  INTEREST
+  CHECK_ISSUE
+  CHECK_RECEIPT
+  CHECK_DEPOSIT
+  CHECK_PAYMENT
+  ADJUSTMENT
+}
+
+enum TreasuryMovementStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  EXECUTED
+  RECONCILED
+  VOID
+}
+
+enum TreasuryChequeKind {
+  OWN
+  THIRD_PARTY
+}
+
+enum TreasuryChequeStatus {
+  PORTFOLIO
+  ISSUED
+  RECEIVED
+  DEPOSITED
+  DEFERRED
+  CLEARED
+  REJECTED
+  CANCELLED
+  ENDORSED
+}
+
+enum TreasuryReconciliationStatus {
+  OPEN
+  BALANCED
+  CLOSED
+}
+
+enum TreasuryCashCountStatus {
+  OPEN
+  CLOSED
+  APPROVED
+}
+
 enum AuditAction {
   LOGIN
   LOGIN_FAILED
@@ -94,6 +154,10 @@ model Company {
   users                User[]
   works                Work[]
   registrationRequests RegistrationRequest[]
+  treasuryAccounts     TreasuryAccount[]
+  treasuryCheques      TreasuryCheque[]
+  treasuryMovements    TreasuryMovement[]
+  treasuryDailyCloses  TreasuryDailyClose[]
 }
 
 model User {
@@ -355,6 +419,8 @@ model Work {
   purchaseOrders     PurchaseOrder[]
   stockMovements     StockMovement[]
   financialMovements FinancialMovement[]
+  treasuryMovements  TreasuryMovement[]
+  treasuryCheques    TreasuryCheque[]
   journalLines       JournalLine[]
   fuelLogs           FuelLog[]
   vehicles           Vehicle[]
@@ -674,6 +740,203 @@ model FinancialMovement {
   bankAccount   BankAccount?      @relation(fields: [bankAccountId], references: [id])
 
   @@index([occurredAt, direction])
+}
+
+model TreasuryAccount {
+  id                   String               @id @default(cuid())
+  companyId            String
+  code                 String
+  name                 String
+  type                 TreasuryAccountType
+  institution          String?
+  accountNumber        String?
+  cbu                  String?
+  alias                String?
+  holderName           String?
+  holderTaxId          String?
+  currency             String               @default("ARS")
+  balance              Decimal              @default(0) @db.Decimal(18, 2)
+  availableBalance     Decimal              @default(0) @db.Decimal(18, 2)
+  overdraftLimit       Decimal              @default(0) @db.Decimal(18, 2)
+  treasurerId          String?
+  includeInCashPosition Boolean              @default(true)
+  active               Boolean              @default(true)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+  deletedAt            DateTime?
+  company              Company              @relation(fields: [companyId], references: [id])
+  sourceMovements      TreasuryMovement[]    @relation("TreasurySourceAccount")
+  destinationMovements TreasuryMovement[]    @relation("TreasuryDestinationAccount")
+  cheques              TreasuryCheque[]
+  reconciliations      TreasuryReconciliation[]
+  cashCounts           TreasuryCashCount[]
+
+  @@unique([companyId, code])
+  @@index([companyId, type, active])
+}
+
+model TreasuryMovement {
+  id                   String                 @id @default(cuid())
+  companyId            String
+  workId               String?
+  sourceAccountId      String?
+  destinationAccountId String?
+  chequeId             String?
+  type                 TreasuryMovementType
+  status               TreasuryMovementStatus @default(PENDING)
+  concept              String
+  amount               Decimal                @db.Decimal(18, 2)
+  currency             String                 @default("ARS")
+  occurredAt           DateTime                @default(now())
+  valueDate            DateTime?
+  counterpartyType     String?
+  counterparty         String?
+  paymentMethod        String?
+  reference            String?
+  receiptNumber        String?
+  notes                String?
+  createdById          String
+  approvedById         String?
+  approvedAt           DateTime?
+  reconciledAt         DateTime?
+  voidedById           String?
+  voidedAt             DateTime?
+  voidReason           String?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  deletedAt            DateTime?
+  company              Company                 @relation(fields: [companyId], references: [id])
+  work                 Work?                   @relation(fields: [workId], references: [id])
+  sourceAccount        TreasuryAccount?        @relation("TreasurySourceAccount", fields: [sourceAccountId], references: [id])
+  destinationAccount   TreasuryAccount?        @relation("TreasuryDestinationAccount", fields: [destinationAccountId], references: [id])
+  cheque               TreasuryCheque?         @relation(fields: [chequeId], references: [id])
+  reconciliationItems  TreasuryReconciliationItem[]
+
+  @@index([companyId, occurredAt, status])
+  @@index([sourceAccountId, occurredAt])
+  @@index([destinationAccountId, occurredAt])
+  @@index([workId])
+}
+
+model TreasuryCheque {
+  id               String                 @id @default(cuid())
+  companyId        String
+  accountId        String?
+  workId           String?
+  kind             TreasuryChequeKind
+  status           TreasuryChequeStatus
+  number           String
+  bankName         String
+  branch            String?
+  accountNumber    String?
+  issuerName       String
+  issuerTaxId      String?
+  beneficiary      String?
+  amount           Decimal                @db.Decimal(18, 2)
+  issueDate        DateTime
+  dueDate          DateTime
+  receivedAt       DateTime?
+  depositedAt      DateTime?
+  clearedAt        DateTime?
+  rejectedAt       DateTime?
+  endorsementChain Json                   @default("[]")
+  notes            String?
+  createdById      String
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  deletedAt        DateTime?
+  company          Company                @relation(fields: [companyId], references: [id])
+  account          TreasuryAccount?       @relation(fields: [accountId], references: [id])
+  work             Work?                  @relation(fields: [workId], references: [id])
+  movements        TreasuryMovement[]
+
+  @@unique([companyId, bankName, number])
+  @@index([companyId, status, dueDate])
+}
+
+model TreasuryReconciliation {
+  id                 String                       @id @default(cuid())
+  accountId          String
+  periodFrom         DateTime
+  periodTo           DateTime
+  statementOpening   Decimal                      @db.Decimal(18, 2)
+  statementClosing   Decimal                      @db.Decimal(18, 2)
+  bookOpening        Decimal                      @db.Decimal(18, 2)
+  bookClosing        Decimal                      @db.Decimal(18, 2)
+  difference         Decimal                      @db.Decimal(18, 2)
+  status             TreasuryReconciliationStatus @default(OPEN)
+  createdById        String
+  closedById         String?
+  closedAt           DateTime?
+  notes              String?
+  createdAt          DateTime                     @default(now())
+  updatedAt          DateTime                     @updatedAt
+  account            TreasuryAccount              @relation(fields: [accountId], references: [id])
+  items              TreasuryReconciliationItem[]
+
+  @@index([accountId, periodTo, status])
+}
+
+model TreasuryReconciliationItem {
+  id                  String                 @id @default(cuid())
+  reconciliationId    String
+  movementId          String?
+  occurredAt          DateTime
+  description         String
+  statementAmount     Decimal                @db.Decimal(18, 2)
+  bookAmount          Decimal                @db.Decimal(18, 2)
+  difference          Decimal                @db.Decimal(18, 2)
+  matched             Boolean                @default(false)
+  notes               String?
+  reconciliation      TreasuryReconciliation @relation(fields: [reconciliationId], references: [id], onDelete: Cascade)
+  movement            TreasuryMovement?      @relation(fields: [movementId], references: [id])
+
+  @@index([reconciliationId, matched])
+}
+
+model TreasuryCashCount {
+  id              String                  @id @default(cuid())
+  accountId       String
+  countedAt       DateTime                @default(now())
+  expectedBalance Decimal                 @db.Decimal(18, 2)
+  countedBalance  Decimal                 @db.Decimal(18, 2)
+  difference      Decimal                 @db.Decimal(18, 2)
+  denominations   Json                    @default("[]")
+  status          TreasuryCashCountStatus @default(OPEN)
+  countedById     String
+  approvedById    String?
+  approvedAt      DateTime?
+  notes           String?
+  createdAt       DateTime                @default(now())
+  account         TreasuryAccount         @relation(fields: [accountId], references: [id])
+
+  @@index([accountId, countedAt])
+}
+
+model TreasuryDailyClose {
+  id                 String       @id @default(cuid())
+  companyId          String
+  closedDate         DateTime
+  openingPosition    Decimal      @db.Decimal(18, 2)
+  totalIncome        Decimal      @db.Decimal(18, 2)
+  totalExpense       Decimal      @db.Decimal(18, 2)
+  closingPosition    Decimal      @db.Decimal(18, 2)
+  bankBalance        Decimal      @db.Decimal(18, 2)
+  savingsBalance     Decimal      @db.Decimal(18, 2)
+  walletBalance      Decimal      @db.Decimal(18, 2)
+  cashBalance        Decimal      @db.Decimal(18, 2)
+  pendingCheques     Decimal      @db.Decimal(18, 2)
+  status             RecordStatus @default(CLOSED)
+  closedById         String
+  approvedById       String?
+  approvedAt         DateTime?
+  notes              String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  company            Company      @relation(fields: [companyId], references: [id])
+
+  @@unique([companyId, closedDate])
+  @@index([companyId, closedDate])
 }
 
 model ChartAccount {
@@ -1492,4 +1755,3 @@ model OrganizationStakeholderRole {
   @@unique([organizationId, workId, roleType])
   @@index([roleType, active])
 }
-
