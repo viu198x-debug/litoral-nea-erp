@@ -49,6 +49,7 @@ test("el runtime del backend contiene el catálogo TypeScript requerido por seed
   const docker = await read("../backend/Dockerfile");
   assert.match(docker, /COPY frontend\/lib \.\/frontend\/lib/);
   assert.match(docker, /COPY --from=build \/app\/frontend\/lib \.\/frontend\/lib/);
+  assert.match(docker, /COPY --from=build \/app\/backend\/node_modules \.\/backend\/node_modules/);
 });
 
 test("Docker ignora secretos y respaldos", async () => {
