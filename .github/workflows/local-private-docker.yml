@@ -48,9 +48,9 @@ jobs:
           curl --fail --silent --show-error http://127.0.0.1:8080/api/v1/health
           test -z "$(docker compose --env-file .env.local -f docker-compose.local.yml port postgres 5432 2>/dev/null)"
           test -z "$(docker compose --env-file .env.local -f docker-compose.local.yml port backend 4000 2>/dev/null)"
-      - name: Seed disposable demonstration data
+      - name: Bootstrap clean private administrator (no fabricated business transactions)
         run: |
-          npm run local:seed-demo
+          npm run local:bootstrap
           docker compose --env-file .env.local -f docker-compose.local.yml exec -T postgres sh -c 'test "$(psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT count(*) FROM \"ModuleConfiguration\"")" -eq 45'
       - name: Verify backed-up database is restorable
         run: |
@@ -58,6 +58,12 @@ jobs:
           BACKUP_FILE="$(find backups/local -type f -name 'lnea_local_*.dump' | sort | tail -n 1)"
           test -n "$BACKUP_FILE"
           npm run local:restore -- "$BACKUP_FILE" --confirm-local-restore
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8080/api/v1/health | grep -q '"status":"ok"'; then
+              break
+            fi
+            sleep 2
+          done
           curl --fail --silent --show-error http://127.0.0.1:8080/api/v1/health
       - name: Print diagnostics after failure
         if: failure()
