@@ -14,6 +14,10 @@ on:
     branches:
       - feature/phase2-data-readiness-api-20261016
 
+concurrency:
+  group: local-docker-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
