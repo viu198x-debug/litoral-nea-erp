@@ -225,7 +225,9 @@ async function main() {
     },
   });
 
-  for (const module of modules) {
+  // Los permisos deben abarcar los 45 módulos del catálogo real de navegación.
+  // La lista histórica `modules` permanece sólo para datos demo legados.
+  for (const { slug: module } of moduleUiDefinitions) {
     for (const action of actions) {
       await prisma.permission.upsert({
         where: { module_action: { module, action } },
