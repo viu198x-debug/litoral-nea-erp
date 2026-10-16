@@ -30,3 +30,18 @@ Este cambio de código no ejecuta migraciones Prisma, no altera BD, no despliega
 
 ## Próximo contrato
 Mantener catálogos especializados por dominio y crear pruebas E2E: obra→presupuesto→compra→stock→costo; certificados→factura→cobro; tesorería→conciliación→contabilidad; asistencia→nómina; usuario→roles→aprobaciones→auditoría. No ampliar la BD en esta rama.
+
+
+## Actualización de dependencias seguras — 16/10/2026
+En la misma rama, luego de la especificación de los 45 módulos, se corrigieron las cinco alertas detectadas por `npm audit` en producción:
+- `next`: 16.3.4 → **16.4.2**.
+- `multer`: 2.3.0 → **2.4.0** (dependencia directa y resolución de NestJS).
+- `proxy-addr`: resolución segura **2.0.8**.
+- `sharp`: resolución segura **0.35.5**.
+- `source-map-js`: resolución segura **1.2.2**.
+
+Se actualizaron `frontend/package.json`, `backend/package.json`, `package.json` (overrides) y el `package-lock.json` generado por npm, sin desactivar las reglas de seguridad. Se añadió el workflow `.github/workflows/security-dependency-remediation.yml` para reconstruir y verificar reproduciblemente el bloqueo de dependencias.
+
+**Prueba reproducible aprobada:** https://github.com/viu198x-debug/litoral-nea-erp/actions/runs/38907427379 . Este flujo obtuvo éxito en: regeneración de lock, verificación exacta de cinco versiones, `npm ci`, `npm audit --omit=dev --audit-level=moderate`, validación/generación Prisma, TypeScript, pruebas backend/frontend y compilación de ambas aplicaciones.
+
+El `npm audit` de producción se ejecutó con umbral **moderate**, más estricto que el umbral `high` del CI principal. No equivale a una certificación de seguridad absoluta ni reemplaza las pruebas con bases y usuarios de producción. Se debe validar el CI del commit final y realizar una revisión técnica del PR antes de integrar a `main`.
