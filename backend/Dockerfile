@@ -22,6 +22,8 @@ ENV CHECKPOINT_DISABLE=1
 ENV PRISMA_HIDE_UPDATE_MESSAGE=1
 
 COPY --from=build /app/node_modules ./node_modules
+# npm workspaces resuelve Multer (y otras dependencias no elevadas) aquí.
+COPY --from=build /app/backend/node_modules ./backend/node_modules
 COPY --from=build /app/backend/dist ./backend/dist
 COPY --from=build /app/backend/package.json ./backend/package.json
 COPY --from=build /app/database ./database
