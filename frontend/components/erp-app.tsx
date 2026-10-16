@@ -89,6 +89,9 @@ import {
 import { activity, alerts, cashflow, works } from "@frontend/lib/demo-data";
 import { demoAccounts, findDemoAccount } from "@frontend/lib/demo-users";
 import { TreasuryPage } from "./treasury-page";
+import { ApprovalsPage } from "./approvals-page";
+import { SpecializedFieldOverview } from "./specialized-field-overview";
+import { ManagementOverviewPanel } from "./management-overview-panel";
 import { groups, modules } from "@frontend/lib/modules";
 import {
   fallbackRecordDefinition,
@@ -600,6 +603,12 @@ export function ErpApp() {
               demoMode={demoMode}
               user={user}
               workItems={availableWorks}
+            />
+          ) : activeSlug === "approvals" ? (
+            <ApprovalsPage
+              request={apiFetch}
+              demoMode={demoMode}
+              canApprove={user.allowedActions.includes("approve") || user.allowedActions.includes("admin")}
             />
           ) : (
             <ModulePage
@@ -2122,7 +2131,7 @@ function ModulePage({
   }, []);
 
   useEffect(() => {
-    if (demoMode || module.slug === "works" || module.slug === "dashboard") return;
+    if (demoMode || ["works", "dashboard", "management", "system", "approvals"].includes(module.slug)) return;
     const controller = new AbortController();
     const params = new URLSearchParams();
     if (effectiveSearch.trim()) params.set("search", effectiveSearch.trim().slice(0, 120));
@@ -2204,6 +2213,31 @@ function ModulePage({
       setDeletingId("");
     }
   };
+
+  if (module.slug === "management" || module.slug === "system") {
+    return (
+      <>
+        <PageHeader eyebrow={module.group.toUpperCase()} title={module.label} description={module.summary} />
+        {module.slug === "management" ? <ManagementOverviewPanel request={apiFetch} demoMode={demoMode} /> : <SectorDashboardPanel module={module} />}
+        <SpecializedFieldOverview slug={module.slug} />
+        {module.slug === "system" && (
+          <>
+            <ModuleConfiguratorPanel />
+            <WorkflowConfiguratorPanel />
+            <ManualUserAdminPanel />
+            <StarterImportPanel />
+            <UserRolesPanel />
+            <RegistrationRequestsPanel />
+            <section className="security-note">
+              <ShieldCheck size={24} />
+              <div><strong>Control de acceso granular</strong><p>Permisos separados por módulo y obra. Las altas y decisiones requieren autorización del backend.</p></div>
+              <button className="button secondary" onClick={() => onNavigate("approvals")}>Ver aprobaciones</button>
+            </section>
+          </>
+        )}
+      </>
+    );
+  }
 
   return (
     <>
@@ -2314,22 +2348,7 @@ function ModulePage({
           window.dispatchEvent(new Event("lnea:records-changed"));
         }}
       />
-      {module.slug === "system" && (
-        <>
-          <ModuleConfiguratorPanel />
-          <WorkflowConfiguratorPanel />
-          <ManualUserAdminPanel />
-          <StarterImportPanel />
-          <UserRolesPanel />
-          <RegistrationRequestsPanel />
-          <section className="security-note">
-            <ShieldCheck size={24} />
-            <div><strong>Control de acceso granular</strong><p>Permisos separados para ver, crear, modificar, aprobar, anular, descargar, exportar y administrar; alcance global o por obra.</p></div>
-            <button className="button secondary" onClick={() => onNavigate("approvals")}>Ver aprobaciones</button>
-          </section>
-        </>
-      )}
-    </>
+     </>
   );
 }
 

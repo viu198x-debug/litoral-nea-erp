@@ -1,0 +1,35 @@
+name: Validación de campos ERP
+
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/module-fields-check.yml"
+  push:
+    branches:
+      - "feature/module-field-catalog-45-20261016"
+
+jobs:
+  field-and-frontend-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.1"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Validate frontend TypeScript
+        run: npm --workspace frontend run lint
+      - name: Execute frontend tests
+        run: npm --workspace frontend run test
+      - name: Build frontend
+        env:
+          NEXT_PUBLIC_DEMO_MODE: "true"
+        run: npm --workspace frontend run build:site
