@@ -35,6 +35,8 @@ test("setup local no sobrescribe secretos ni admite credenciales remotas", async
   assert.match(script, /POSTGRES_DB !== "litoral_nea_erp_local"/);
   assert.match(script, /POSTGRES_USER !== "lnea_local"/);
   assert.match(script, /pg_dump/);
+  assert.match(script, /bootstrap-local\.ts/);
+  assert.match(script, /El seed demo sólo se permite en una base vacía/);
   assert.match(script, /pg_restore/);
   assert.match(script, /--confirm-local-restore/);
   assert.match(script, /createHash\("sha256"\)/);
