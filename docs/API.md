@@ -104,6 +104,16 @@ Las dos decisiones de registración requieren `system.admin`. La aprobación
 crea o vincula el usuario y asigna por defecto el rol mínimo `TEC_JEFE_OBRA`; la
 interfaz administrativa permite procesar la bandeja pendiente.
 
+## Diagnóstico de datos y migraciones (Fase 2)
+
+| Método | Ruta | Permiso | Efecto |
+| --- | --- | --- | --- |
+| GET | /system/data-readiness | system.admin | Sólo lectura: estado de migraciones Prisma y 45 módulos configurados |
+
+La consulta utiliza la conexión del servidor; no recibe URL de base de datos, SQL, credenciales ni parámetros de migración desde el usuario. Un error de conexión o falta de la tabla de migraciones devuelve HTTP 503 sin revelar datos sensibles.
+
+`READY_FOR_REVIEW` sólo indica que coinciden las migraciones esperadas y la configuración básica; `ACTION_REQUIRED` identifica brechas. **Ninguno de los dos estados certifica por sí solo que la instalación esté lista para producción.** No se ejecutan migraciones, cambios de permisos ni seeds desde este endpoint.
+
 ## Salud
 
 **GET /health** es público y verifica que PostgreSQL responda.
