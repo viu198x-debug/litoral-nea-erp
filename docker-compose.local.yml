@@ -85,7 +85,9 @@ services:
     depends_on:
       backend: { condition: service_started }
       frontend: { condition: service_started }
-    networks: [local_internal]
+    # Segundo enlace para permitir la publicación EXCLUSIVA en loopback del host.
+    # BD, API y frontend permanecen únicamente en la red interna.
+    networks: [local_internal, local_loopback]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
 
@@ -97,3 +99,5 @@ networks:
   local_internal:
     driver: bridge
     internal: true
+  local_loopback:
+    driver: bridge
