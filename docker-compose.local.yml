@@ -44,6 +44,8 @@ services:
       SEED_DEMO: "false"
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Ejecutar npm run local:init}
       SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:?Ejecutar npm run local:init}
+      LOCAL_BOOTSTRAP_ONLY: "true"
+      LOCAL_ADMIN_PASSWORD: ${LOCAL_ADMIN_PASSWORD:?Ejecutar npm run local:init}
       DOCUMENT_STORAGE_PATH: /app/storage/documents
       MAX_UPLOAD_MB: "50"
       ALLOW_SELF_APPROVAL: "false"
