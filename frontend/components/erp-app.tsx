@@ -92,6 +92,7 @@ import { TreasuryPage } from "./treasury-page";
 import { ApprovalsPage } from "./approvals-page";
 import { SpecializedFieldOverview } from "./specialized-field-overview";
 import { ManagementOverviewPanel } from "./management-overview-panel";
+import { DataReadinessPanel } from "./data-readiness-panel";
 import { groups, modules } from "@frontend/lib/modules";
 import {
   fallbackRecordDefinition,
@@ -2222,6 +2223,7 @@ function ModulePage({
         <SpecializedFieldOverview slug={module.slug} />
         {module.slug === "system" && (
           <>
+            <DataReadinessPanel request={apiFetch} demoMode={demoMode} />
             <ModuleConfiguratorPanel />
             <WorkflowConfiguratorPanel />
             <ManualUserAdminPanel />

@@ -1,0 +1,80 @@
+name: ERP Local Private Docker
+
+on:
+  pull_request:
+    paths:
+      - "docker-compose.local.yml"
+      - "backend/Dockerfile"
+      - "frontend/Dockerfile"
+      - "docker/**"
+      - "scripts/local-erp*"
+      - ".dockerignore"
+      - ".github/workflows/local-private-docker.yml"
+  push:
+    branches:
+      - feature/phase2-data-readiness-api-20261016
+
+concurrency:
+  group: local-docker-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  local-sandbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13.1"
+      - name: Test local CLI and isolation guards
+        run: |
+          node --check scripts/local-erp.mjs
+          node --test scripts/local-erp.test.mjs
+      - name: Generate disposable private secrets
+        run: npm run local:init
+      - name: Validate non-public Docker configuration
+        run: docker compose --env-file .env.local -f docker-compose.local.yml config --quiet
+      - name: Build and launch isolated local ERP
+        run: npm run local:up
+      - name: Confirm local-only gateway and health check
+        run: |
+          docker compose --env-file .env.local -f docker-compose.local.yml ps
+          docker compose --env-file .env.local -f docker-compose.local.yml logs --tail 25 backend gateway postgres || true
+          for attempt in $(seq 1 40); do
+            if curl --silent --fail http://127.0.0.1:8080/api/v1/health | grep -q '"status":"ok"'; then
+              break
+            fi
+            sleep 3
+          done
+          curl --fail --silent --show-error http://127.0.0.1:8080/api/v1/health
+          test -z "$(docker compose --env-file .env.local -f docker-compose.local.yml port postgres 5432 2>/dev/null)"
+          test -z "$(docker compose --env-file .env.local -f docker-compose.local.yml port backend 4000 2>/dev/null)"
+      - name: Bootstrap clean private administrator (no fabricated business transactions)
+        run: |
+          npm run local:bootstrap
+          docker compose --env-file .env.local -f docker-compose.local.yml exec -T backend node -e 'const {PrismaClient}=require("@prisma/client");const p=new PrismaClient();Promise.all([p.moduleConfiguration.count({where:{slug:{not:"treasury-accounts"}}}),p.user.count(),p.work.count()]).then(([m,u,w])=>{console.log({modules:m,users:u,works:w});if(m!==45||u!==1||w!==0)process.exitCode=1}).catch(e=>{console.error(e);process.exitCode=1}).finally(()=>p.$disconnect())'
+      - name: Verify backed-up database is restorable
+        run: |
+          npm run local:backup
+          BACKUP_FILE="$(find backups/local -type f -name 'lnea_local_*.dump' | sort | tail -n 1)"
+          test -n "$BACKUP_FILE"
+          npm run local:restore -- "$BACKUP_FILE" --confirm-local-restore
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:8080/api/v1/health | grep -q '"status":"ok"'; then
+              break
+            fi
+            sleep 2
+          done
+          curl --fail --silent --show-error http://127.0.0.1:8080/api/v1/health
+      - name: Print diagnostics after failure
+        if: failure()
+        run: |
+          docker compose --env-file .env.local -f docker-compose.local.yml ps || true
+          docker compose --env-file .env.local -f docker-compose.local.yml logs --tail 100 backend postgres gateway || true
+      - name: Stop ephemeral sandbox (retain no published service)
+        if: always()
+        run: npm run local:down || true
