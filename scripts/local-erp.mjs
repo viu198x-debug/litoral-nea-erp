@@ -58,6 +58,7 @@ async function init() {
     "CSRF_SECRET=" + secret(48),
     "SEED_ADMIN_PASSWORD=" + secret(24),
     "SEED_USER_PASSWORD=" + secret(24),
+    "LOCAL_ADMIN_PASSWORD=" + secret(24),
     "",
   ].join("\n");
   try {
@@ -155,11 +156,23 @@ async function main() {
     case "down": return compose(["down"]); // Nunca -v: conserva volúmenes.
     case "ps": return compose(["ps"]);
     case "logs": return compose(["logs", "--tail", "120", "backend"]);
-    case "seed-demo":
+    case "bootstrap":
+      return compose(["exec", "-T", "backend", "./node_modules/.bin/tsx", "database/prisma/bootstrap-local.ts"]);
+    case "seed-demo": {
+      const query = spawnSync("docker", [...argsBase, "exec", "-T", "postgres",
+        "psql", "-U", "lnea_local", "-d", "litoral_nea_erp_local",
+        "-tAc", 'SELECT count(*) FROM "Company"'], {
+        cwd: root, encoding: "utf8",
+      });
+      if (query.error) throw query.error;
+      if (query.status !== 0 || query.stdout.trim() !== "0") {
+        throw new Error("El seed demo sólo se permite en una base vacía; no mezclar con el entorno local real.");
+      }
       return compose(["exec", "-T", "backend", "./node_modules/.bin/tsx", "database/prisma/seed.ts"]);
+    }
     case "backup": return dumpBackup();
     case "restore": return restore(process.argv[3], process.argv[4]);
-    default: throw new Error("Comando disponible: init | up | down | ps | logs | seed-demo | backup | restore");
+    default: throw new Error("Comando disponible: init | up | down | ps | logs | bootstrap | seed-demo | backup | restore");
   }
 }
 main().catch((error) => fail(error instanceof Error ? error.message : String(error)));
