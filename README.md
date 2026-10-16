@@ -1,6 +1,4 @@
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/viu198x-debug/litoral-nea-erp)
-
-> El Blueprint `render.yaml` crea el frontend, la API NestJS y PostgreSQL. Las contraseñas iniciales del seed se generan como secretos en Render y no están hardcodeadas en el repositorio.
+> **FASE ACTUAL: DESARROLLO LOCAL Y PRIVADO.** No publicar, desplegar en Render ni integrar `main` mientras los servicios externos tengan autodespliegue activo. Usar la instalación local aislada descrita en [docs/DESARROLLO_LOCAL.md](docs/DESARROLLO_LOCAL.md).
 
 # LITORAL NEA ERP
 
@@ -20,6 +18,22 @@ La solución se entrega como monorepo:
 - **docker-compose.production.yml**: despliegue VPS con PostgreSQL privado y HTTPS automático.
 - **docs/**: arquitectura, API, seguridad, instalación y producción.
 
+## Entorno local recomendado (fase de desarrollo)
+
+En Windows con Docker Desktop y Node.js 22, ejecutar desde la carpeta del repositorio:
+
+```powershell
+npm run local:init
+npm run local:up
+npm run local:ps
+```
+
+Abrir `http://127.0.0.1:8080`. Se utiliza **PostgreSQL dentro de Docker**, sin exposición de puertos de base de datos ni de API. El servidor no apunta a Render o Neon.
+
+La base comienza vacía. Para cargar **sólo datos ficticios de prueba**, ejecutar explícitamente `npm run local:seed-demo`. El administrador demo usa la clave generada en `.env.local` bajo `SEED_ADMIN_PASSWORD`.
+
+Otros comandos: `npm run local:backup`, `npm run local:down`, `npm run local:logs`; ver respaldo y restauración en la guía. No ejecutar `docker compose down -v`.
+
 ## Inicio rápido con Docker
 
 1. Copiar **.env.example** como **.env**.
@@ -33,8 +47,7 @@ La solución se entrega como monorepo:
 4. Abrir http://localhost:8080.
 5. Verificar la API en http://localhost:8080/api/v1/health.
 
-El primer arranque aplica migraciones y, con **SEED_DEMO=true**, carga siete
-usuarios, roles/permisos, catálogos y ocho obras.
+El primer arranque aplica migraciones a la base **local**. Los datos demo requieren activar el seed expresamente; el entorno local recomendado no inserta datos ficticios por defecto.
 
 ## Acceso demo
 
