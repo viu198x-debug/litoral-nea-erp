@@ -24,17 +24,29 @@ Acceder únicamente desde la misma computadora: **http://127.0.0.1:8080** (alter
 
 **La inicialización crea `.env.local`** con contraseñas y secretos aleatorios, sin imprimirlos. El archivo está ignorado por Git, no debe compartirse, subir a Drive ni agregarse a capturas de pantalla. `local:init` es deliberadamente no destructivo: se niega a sobrescribir un `.env.local` existente. El puerto se puede cambiar modificando `APP_PORT` en ese archivo.
 
+## Alta inicial sin datos ficticios (recomendado)
+
+Después del primer arranque de los contenedores, inicializar empresa, roles, permisos, campos y **un único administrador local**:
+
+```powershell
+npm run local:bootstrap
+```
+
+Este comando crea **45 módulos**, los permisos del Administrador General y campos configurables sin crear obras, compras, pagos, activos ni empleados ficticios. Es específico de la conexión local `postgres/litoral_nea_erp_local` y se niega a modificar una base con otra empresa previamente registrada.
+
+Ingresar con usuario `admin.local@litoralnea.invalid` y contraseña `LOCAL_ADMIN_PASSWORD` de `.env.local`. La empresa inicial tiene CUIT marcador `LOCAL-ONLY-NO-CUIT`; no utilizarla como identificación fiscal real ni facturar con ella. El aprovisionamiento sólo crea un administrador y no reemplaza el proceso futuro de alta legal y fiscal.
+
 ## Datos de prueba: acción explícita
 
-La base arranca **vacía** y sólo se aplican las migraciones del repositorio local. Por defecto `SEED_DEMO=false`, por lo que no se insertan obras, personal ni usuarios ficticios automáticamente. Si se desean datos de demostración, ejecutar una única vez:
+La base arranca **vacía** y sólo se aplican las migraciones del repositorio local. Por defecto `SEED_DEMO=false`, por lo que no se insertan obras, personal ni usuarios ficticios automáticamente. **Alternativa para una instalación de laboratorio completamente vacía, en lugar de `local:bootstrap`:** si se desean datos de demostración, ejecutar una única vez:
 
 ```powershell
 npm run local:seed-demo
 ```
 
-Acceso al entorno de prueba: usuario `admin@litoralnea.com`. La contraseña es el valor de **SEED_ADMIN_PASSWORD** en el archivo local `.env.local`; los otros usuarios utilizan `SEED_USER_PASSWORD`. Las credenciales demo no son aptas para uso real ni para publicación. **El seed actual también modifica datos al repetirse**; no ejecutarlo sobre información que se desee preservar. No sirve para migrar registros reales.
+Acceso al entorno de prueba: usuario `admin@litoralnea.com`. La contraseña es el valor de **SEED_ADMIN_PASSWORD** en el archivo local `.env.local`; los otros usuarios utilizan `SEED_USER_PASSWORD`. Las credenciales demo no son aptas para uso real ni para publicación. **El comando rechaza una base que ya contenga una empresa. El seed también modifica datos al repetirse**; no ejecutarlo sobre información que se desee preservar. No sirve para migrar registros reales.
 
-Si desea comenzar con datos propios sin ejecutar el seed de demostración, hará falta implementar y probar un aprovisionamiento administrativo real inicial que no cargue registros ficticios. No confundir este arranque vacío con una app lista para usuarios.
+Para usar registros propios de prueba se recomienda `local:bootstrap`; la identificación fiscal definitiva, los catálogos profesionales y las validaciones completas siguen pendientes. Una instalación creada con `local:bootstrap` no debe recibir `local:seed-demo`.
 
 ## Separación técnica
 
@@ -82,7 +94,7 @@ Reemplazar el nombre por uno realmente creado. Antes de restaurar: (1) verificar
 
 ## Pendientes antes de considerar la instalación «terminada»
 
-1. Alta inicial de la empresa y administrador sin datos de muestra.
+1. Completar alta fiscal definitiva y administración de usuarios: el bootstrap local sólo crea un administrador y un identificador tributario marcador.
 2. Validar todos los 45 módulos con registraciones reales y consistencia referencial.
 3. Probar concurrencia, idempotencia, reversos, liquidaciones y rendición de fondos.
 4. Ejecutar smoke test de Docker Compose, creación de backup y restauración.
