@@ -2,8 +2,10 @@ name: Refresh Security Lock
 
 on:
   push:
+    branches: [main]
     paths:
       - .github/refresh-security-lock.trigger
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -11,7 +13,7 @@ permissions:
 jobs:
   refresh-lock:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
@@ -20,10 +22,39 @@ jobs:
         with:
           node-version: "22.13.1"
           cache: npm
-      - name: Regenerate package lock with security overrides
+      - name: Regenerate lock without weakening security overrides
         run: npm install --package-lock-only --ignore-scripts --no-audit --no-fund
-      - name: Verify patched Multer resolution
-        run: node -e "const l=require('./package-lock.json'); const p=l.packages['node_modules/multer']; if(!p || p.version!=='2.3.0') { console.error(p); process.exit(1) } console.log('multer',p.version)"
+      - name: Verify patched dependency resolutions
+        run: |
+          node <<'NODE'
+          const assert = require('node:assert/strict');
+          const packages = require('./package-lock.json').packages;
+          for (const [name, minimum] of Object.entries({
+            next: [16, 4, 2],
+            multer: [2, 4, 0],
+            'proxy-addr': [2, 0, 8],
+            sharp: [0, 35, 5],
+            'source-map-js': [1, 2, 2],
+          })) {
+            const matches = Object.entries(packages).filter(([path]) =>
+              path === 'node_modules/' + name || path.endsWith('/node_modules/' + name)
+            );
+            assert.ok(matches.length, 'Missing ' + name);
+            for (const [path, entry] of matches) {
+              const actual = entry.version.split('.').slice(0, 3).map(Number);
+              assert.ok(actual[0] > minimum[0] ||
+                (actual[0] === minimum[0] &&
+                (actual[1] > minimum[1] ||
+                (actual[1] === minimum[1] && actual[2] >= minimum[2]))),
+                'Insecure version at ' + path + ': ' + entry.version
+              );
+            }
+          }
+          NODE
+      - name: Reproducible installation
+        run: npm ci --no-fund
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate
       - name: Commit refreshed lockfile
         run: |
           git config user.name "github-actions[bot]"
@@ -32,6 +63,6 @@ jobs:
           if git diff --cached --quiet; then
             echo "No lockfile changes required"
           else
-            git commit -m "security: refresh lockfile with patched dependencies"
+            git commit -m "security: refresh audited dependency lockfile"
             git push origin HEAD:main
           fi
