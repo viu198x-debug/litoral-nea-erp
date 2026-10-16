@@ -27,7 +27,8 @@
     "local:logs": "node scripts/local-erp.mjs logs",
     "local:seed-demo": "node scripts/local-erp.mjs seed-demo",
     "local:backup": "node scripts/local-erp.mjs backup",
-    "local:restore": "node scripts/local-erp.mjs restore"
+    "local:restore": "node scripts/local-erp.mjs restore",
+    "local:bootstrap": "node scripts/local-erp.mjs bootstrap"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
