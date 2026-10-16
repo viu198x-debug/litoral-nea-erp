@@ -29,7 +29,7 @@ services:
       NODE_ENV: development
       PORT: "4000"
       API_PREFIX: api/v1
-      FRONTEND_URL: http://localhost:${APP_PORT:-8080}
+      FRONTEND_URL: http://127.0.0.1:${APP_PORT:-8080},http://localhost:${APP_PORT:-8080}
       BACKEND_PUBLIC_URL: http://localhost:${APP_PORT:-8080}
       TRUST_PROXY: "true"
       DATABASE_URL: postgresql://${POSTGRES_USER:?Definir usuario}:${POSTGRES_PASSWORD:?Definir clave}@postgres:5432/${POSTGRES_DB:?Definir base}?schema=public
