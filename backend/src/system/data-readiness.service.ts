@@ -1,5 +1,5 @@
 import { Injectable, ServiceUnavailableException } from "@nestjs/common";
-import type { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from "../prisma/prisma.service";
 import { ERP_MODULES } from "../common/validation.pipes";
 
 // Versioned migrations committed to database/prisma/migrations.
