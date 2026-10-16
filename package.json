@@ -19,7 +19,15 @@
     "test": "npm --workspace backend run test && npm --workspace frontend run test",
     "prisma:generate": "CHECKPOINT_DISABLE=1 PRISMA_HIDE_UPDATE_MESSAGE=1 prisma generate --schema database/prisma/schema.prisma",
     "prisma:migrate": "CHECKPOINT_DISABLE=1 PRISMA_HIDE_UPDATE_MESSAGE=1 prisma migrate dev --schema database/prisma/schema.prisma",
-    "prisma:seed": "tsx database/prisma/seed.ts"
+    "prisma:seed": "tsx database/prisma/seed.ts",
+    "local:init": "node scripts/local-erp.mjs init",
+    "local:up": "node scripts/local-erp.mjs up",
+    "local:down": "node scripts/local-erp.mjs down",
+    "local:ps": "node scripts/local-erp.mjs ps",
+    "local:logs": "node scripts/local-erp.mjs logs",
+    "local:seed-demo": "node scripts/local-erp.mjs seed-demo",
+    "local:backup": "node scripts/local-erp.mjs backup",
+    "local:restore": "node scripts/local-erp.mjs restore"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
