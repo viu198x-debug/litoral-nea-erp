@@ -10,6 +10,8 @@ RUN npm ci
 
 COPY backend ./backend
 COPY database ./database
+# Seed local parametrizado: requiere el catálogo de 45 módulos.
+COPY frontend/lib ./frontend/lib
 RUN ./node_modules/.bin/prisma generate --schema database/prisma/schema.prisma
 RUN npm --workspace backend run build
 
@@ -23,6 +25,7 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/backend/dist ./backend/dist
 COPY --from=build /app/backend/package.json ./backend/package.json
 COPY --from=build /app/database ./database
+COPY --from=build /app/frontend/lib ./frontend/lib
 COPY docker/entrypoint-backend.sh /usr/local/bin/entrypoint-backend
 RUN mkdir -p /app/storage/documents \
     && chown -R node:node /app/storage \
