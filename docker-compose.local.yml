@@ -1,0 +1,97 @@
+# Entorno exclusivamente LOCAL: no expone PostgreSQL ni API al host o a internet.
+# Arranque: npm run local:init && npm run local:up
+name: litoral-nea-erp-local
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?Ejecutar npm run local:init}
+      POSTGRES_USER: ${POSTGRES_USER:?Ejecutar npm run local:init}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Ejecutar npm run local:init}
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 18
+    networks: [local_internal]
+    security_opt: [no-new-privileges:true]
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: "4000"
+      API_PREFIX: api/v1
+      FRONTEND_URL: http://localhost:${APP_PORT:-8080}
+      BACKEND_PUBLIC_URL: http://localhost:${APP_PORT:-8080}
+      TRUST_PROXY: "true"
+      DATABASE_URL: postgresql://${POSTGRES_USER:?Definir usuario}:${POSTGRES_PASSWORD:?Definir clave}@postgres:5432/${POSTGRES_DB:?Definir base}?schema=public
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?Ejecutar npm run local:init}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Ejecutar npm run local:init}
+      CSRF_SECRET: ${CSRF_SECRET:?Ejecutar npm run local:init}
+      JWT_ISSUER: litoral-nea-local
+      JWT_AUDIENCE: litoral-nea-api
+      ACCESS_TOKEN_TTL: 15m
+      REFRESH_TOKEN_DAYS: "7"
+      COOKIE_SECURE: "false"
+      SEED_DEMO: "false"
+      SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:?Ejecutar npm run local:init}
+      SEED_USER_PASSWORD: ${SEED_USER_PASSWORD:?Ejecutar npm run local:init}
+      DOCUMENT_STORAGE_PATH: /app/storage/documents
+      MAX_UPLOAD_MB: "50"
+      ALLOW_SELF_APPROVAL: "false"
+      GOOGLE_CLIENT_ID: ""
+      GOOGLE_CLIENT_SECRET: ""
+      MICROSOFT_CLIENT_ID: ""
+      MICROSOFT_CLIENT_SECRET: ""
+    volumes:
+      - document_local_data:/app/storage/documents
+    depends_on:
+      postgres: { condition: service_healthy }
+    networks: [local_internal]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    read_only: true
+    tmpfs: [/tmp:size=128m,mode=1777]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: /api/v1
+        NEXT_PUBLIC_DEMO_MODE: "false"
+    restart: unless-stopped
+    networks: [local_internal]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+  gateway:
+    image: nginxinc/nginx-unprivileged:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${APP_PORT:-8080}:8080"
+    volumes:
+      - ./docker/nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      backend: { condition: service_started }
+      frontend: { condition: service_started }
+    networks: [local_internal]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+
+volumes:
+  postgres_local_data:
+  document_local_data:
+
+networks:
+  local_internal:
+    driver: bridge
+    internal: true
