@@ -91,6 +91,7 @@ import { demoAccounts, findDemoAccount } from "@frontend/lib/demo-users";
 import { TreasuryPage } from "./treasury-page";
 import { ApprovalsPage } from "./approvals-page";
 import { SpecializedFieldOverview } from "./specialized-field-overview";
+import { ManagementOverviewPanel } from "./management-overview-panel";
 import { groups, modules } from "@frontend/lib/modules";
 import {
   fallbackRecordDefinition,
@@ -2217,7 +2218,7 @@ function ModulePage({
     return (
       <>
         <PageHeader eyebrow={module.group.toUpperCase()} title={module.label} description={module.summary} />
-        <SectorDashboardPanel module={module} />
+        {module.slug === "management" ? <ManagementOverviewPanel request={apiFetch} demoMode={demoMode} /> : <SectorDashboardPanel module={module} />}
         <SpecializedFieldOverview slug={module.slug} />
         {module.slug === "system" && (
           <>
