@@ -30,7 +30,7 @@ npm run local:ps
 
 Abrir `http://127.0.0.1:8080`. Se utiliza **PostgreSQL dentro de Docker**, sin exposición de puertos de base de datos ni de API. El servidor no apunta a Render o Neon.
 
-La base comienza vacía. Para cargar **sólo datos ficticios de prueba**, ejecutar explícitamente `npm run local:seed-demo`. El administrador demo usa la clave generada en `.env.local` bajo `SEED_ADMIN_PASSWORD`.
+La base comienza vacía. Para crear **un administrador local sin datos ficticios**, ejecutar `npm run local:bootstrap` y acceder con `admin.local@litoralnea.invalid` y la clave `LOCAL_ADMIN_PASSWORD` de `.env.local`. Como alternativa, sólo sobre una base nueva y vacía, `npm run local:seed-demo` carga datos ficticios; no mezclar ambos procedimientos.
 
 Otros comandos: `npm run local:backup`, `npm run local:down`, `npm run local:logs`; ver respaldo y restauración en la guía. No ejecutar `docker compose down -v`.
 
