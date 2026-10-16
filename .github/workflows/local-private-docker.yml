@@ -56,7 +56,7 @@ jobs:
       - name: Bootstrap clean private administrator (no fabricated business transactions)
         run: |
           npm run local:bootstrap
-          docker compose --env-file .env.local -f docker-compose.local.yml exec -T postgres sh -c 'test "$(psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "SELECT count(*) FROM \"ModuleConfiguration\"")" -eq 45'
+          docker compose --env-file .env.local -f docker-compose.local.yml exec -T backend node -e 'const {PrismaClient}=require("@prisma/client");const p=new PrismaClient();Promise.all([p.moduleConfiguration.count(),p.user.count(),p.work.count()]).then(([m,u,w])=>{console.log({modules:m,users:u,works:w});if(m!==45||u!==1||w!==0)process.exitCode=1}).catch(e=>{console.error(e);process.exitCode=1}).finally(()=>p.$disconnect())'
       - name: Verify backed-up database is restorable
         run: |
           npm run local:backup
